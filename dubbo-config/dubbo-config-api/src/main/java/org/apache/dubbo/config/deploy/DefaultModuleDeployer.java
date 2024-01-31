@@ -139,6 +139,9 @@ public class DefaultModuleDeployer extends AbstractDeployer<ModuleModel> impleme
             initialize();
 
             // export services
+            /**
+             * 导出自己的服务
+             */
             exportServices();
 
             // prepare application instance
@@ -148,6 +151,9 @@ public class DefaultModuleDeployer extends AbstractDeployer<ModuleModel> impleme
             }
 
             // refer services
+            /**
+             * 引用需要消费服务
+             */
             referServices();
 
             // if no async export/refer services, just set started
@@ -306,6 +312,7 @@ public class DefaultModuleDeployer extends AbstractDeployer<ModuleModel> impleme
     }
 
     private void exportServices() {
+        // 导出每个service
         for (ServiceConfigBase sc : configManager.getServices()) {
             exportServiceInternal(sc);
         }
@@ -324,7 +331,9 @@ public class DefaultModuleDeployer extends AbstractDeployer<ModuleModel> impleme
             CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
                 try {
                     if (!sc.isExported()) {
+                        // 执行导出
                         sc.export();
+                        // 缓存已导出的service
                         exportedServices.add(sc);
                     }
                 } catch (Throwable t) {
@@ -361,9 +370,11 @@ public class DefaultModuleDeployer extends AbstractDeployer<ModuleModel> impleme
     }
 
     private void referServices() {
+        // 引用
         configManager.getReferences().forEach(rc -> {
             try {
                 ReferenceConfig<?> referenceConfig = (ReferenceConfig<?>) rc;
+                // 执行s
                 if (!referenceConfig.isRefreshed()) {
                     referenceConfig.refresh();
                 }
@@ -381,6 +392,9 @@ public class DefaultModuleDeployer extends AbstractDeployer<ModuleModel> impleme
 
                         asyncReferringFutures.add(future);
                     } else {
+                        /**
+                         * 具体执行
+                         */
                         referenceCache.get(rc);
                     }
                 }

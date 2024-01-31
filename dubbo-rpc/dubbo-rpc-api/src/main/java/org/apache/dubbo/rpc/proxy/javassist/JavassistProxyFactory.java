@@ -38,12 +38,23 @@ public class JavassistProxyFactory extends AbstractProxyFactory {
     @Override
     public <T> Invoker<T> getInvoker(T proxy, Class<T> type, URL url) {
         // TODO Wrapper cannot handle this scenario correctly: the classname contains '$'
+        //
+        /**
+         * 生成一个新的字节码代理类，这里应该是本地的逻辑扩展（如filter）
+         *
+         * 带$即自定义字节码的代码类，所以取回被代理类
+         */
         final Wrapper wrapper = Wrapper.getWrapper(proxy.getClass().getName().indexOf('$') < 0 ? proxy.getClass() : type);
+
+        /**
+         * 生成代理Invoker
+         */
         return new AbstractProxyInvoker<T>(proxy, type, url) {
             @Override
             protected Object doInvoke(T proxy, String methodName,
                                       Class<?>[] parameterTypes,
                                       Object[] arguments) throws Throwable {
+                // 通过代理类，调用实际方法
                 return wrapper.invokeMethod(proxy, methodName, parameterTypes, arguments);
             }
         };

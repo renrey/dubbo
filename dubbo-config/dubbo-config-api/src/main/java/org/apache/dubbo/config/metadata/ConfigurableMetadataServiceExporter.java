@@ -86,6 +86,9 @@ public class ConfigurableMetadataServiceExporter implements MetadataServiceExpor
 
         if (!isExported()) {
 
+            /**
+             * serviceConfig的export
+             */
             ApplicationConfig applicationConfig = getApplicationConfig();
             ServiceConfig<MetadataService> serviceConfig = new ServiceConfig<>();
             serviceConfig.setScopeModel(applicationModel.getInternalModule());

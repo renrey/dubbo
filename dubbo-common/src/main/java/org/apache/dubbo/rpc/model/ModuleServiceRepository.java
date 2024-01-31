@@ -131,6 +131,7 @@ public class ModuleServiceRepository {
         ServiceDescriptor serviceDescriptor = registerService(interfaceClass);
         // if path is different with interface name, add extra path mapping
         if (!interfaceClass.getName().equals(path)) {
+            // path中保存service容器
             List<ServiceDescriptor> serviceDescriptors = services.computeIfAbsent(path,
                 _k -> new CopyOnWriteArrayList<>());
             synchronized (serviceDescriptors) {

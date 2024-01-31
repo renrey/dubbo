@@ -93,7 +93,10 @@ public class RestProtocol extends AbstractProxyProtocol {
     protected <T> Runnable doExport(T impl, Class<T> type, URL url) throws RpcException {
         String addr = getAddr(url);
         Class implClass = url.getServiceModel().getProxyObject().getClass();
+        // 创建http服务器，对应端口已有则不需要
         RestProtocolServer server = (RestProtocolServer) serverMap.computeIfAbsent(addr, restServer -> {
+            // 创建
+            // 实际上层默认配置项为netty
             RestProtocolServer s = serverFactory.createServer(url.getParameter(SERVER_KEY, DEFAULT_SERVER));
             s.setAddress(url.getAddress());
             s.start(url);

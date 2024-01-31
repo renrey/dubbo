@@ -80,6 +80,7 @@ public abstract class AbstractLoadBalance implements LoadBalance {
             weight = url.getParameter(REGISTRY_KEY + "." + WEIGHT_KEY, DEFAULT_WEIGHT);
         } else {
             weight = url.getMethodParameter(invocation.getMethodName(), WEIGHT_KEY, DEFAULT_WEIGHT);
+            // >0
             if (weight > 0) {
                 long timestamp = invoker.getUrl().getParameter(TIMESTAMP_KEY, 0L);
                 if (timestamp > 0L) {

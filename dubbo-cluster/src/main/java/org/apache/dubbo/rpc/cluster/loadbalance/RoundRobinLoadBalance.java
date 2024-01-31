@@ -88,39 +88,49 @@ public class RoundRobinLoadBalance extends AbstractLoadBalance {
 
     @Override
     protected <T> Invoker<T> doSelect(List<Invoker<T>> invokers, URL url, Invocation invocation) {
+        // key = service.方法
         String key = invokers.get(0).getUrl().getServiceKey() + "." + invocation.getMethodName();
+        // 获取or生成当前服务方法的下每个节点顺序计数
         ConcurrentMap<String, WeightedRoundRobin> map = methodWeightMap.computeIfAbsent(key, k -> new ConcurrentHashMap<>());
         int totalWeight = 0;
         long maxCurrent = Long.MIN_VALUE;
         long now = System.currentTimeMillis();
         Invoker<T> selectedInvoker = null;
         WeightedRoundRobin selectedWRR = null;
+        // 遍历可用节点invoker
         for (Invoker<T> invoker : invokers) {
             String identifyString = invoker.getUrl().toIdentityString();
             int weight = getWeight(invoker, invocation);
+            // 如果当前节点，无计数则创建
             WeightedRoundRobin weightedRoundRobin = map.computeIfAbsent(identifyString, k -> {
                 WeightedRoundRobin wrr = new WeightedRoundRobin();
                 wrr.setWeight(weight);
                 return wrr;
             });
 
+            // 更新缓存的计数
             if (weight != weightedRoundRobin.getWeight()) {
                 //weight changed
                 weightedRoundRobin.setWeight(weight);
             }
+            //缓存计数 +1
             long cur = weightedRoundRobin.increaseCurrent();
             weightedRoundRobin.setLastUpdate(now);
             if (cur > maxCurrent) {
+                // 更新maxCurrent为cur
                 maxCurrent = cur;
+                // 本次返回的invoker
                 selectedInvoker = invoker;
                 selectedWRR = weightedRoundRobin;
             }
+            // 累计
             totalWeight += weight;
         }
         if (invokers.size() != map.size()) {
             map.entrySet().removeIf(item -> now - item.getValue().getLastUpdate() > RECYCLE_PERIOD);
         }
         if (selectedInvoker != null) {
+            // 把本次计数降权
             selectedWRR.sel(totalWeight);
             return selectedInvoker;
         }

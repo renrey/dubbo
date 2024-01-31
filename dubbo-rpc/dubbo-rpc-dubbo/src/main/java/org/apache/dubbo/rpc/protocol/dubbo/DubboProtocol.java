@@ -310,6 +310,7 @@ public class DubboProtocol extends AbstractProtocol {
             }
         }
 
+        // 打开服务器
         openServer(url);
         optimizeSerialization(url);
 
@@ -328,6 +329,7 @@ public class DubboProtocol extends AbstractProtocol {
                 synchronized (this) {
                     server = serverMap.get(key);
                     if (server == null) {
+                        // 创建
                         serverMap.put(key, createServer(url));
                     }else {
                         server.reset(url);

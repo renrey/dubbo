@@ -119,6 +119,7 @@ public abstract class Wrapper {
             return OBJECT_WRAPPER;
         }
 
+        // 从缓存获取，如果不存在则创建并缓存
         return WRAPPER_MAP.computeIfAbsent(c, Wrapper::makeWrapper);
     }
 

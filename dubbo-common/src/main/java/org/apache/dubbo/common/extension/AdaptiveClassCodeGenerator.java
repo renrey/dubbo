@@ -100,6 +100,7 @@ public class AdaptiveClassCodeGenerator {
      */
     public String generate(boolean sort) {
         // no need to generate adaptive class since there's no adaptive method found.
+        // 没有Adaptive注解的方法，会终止
         if (!hasAdaptiveMethod()) {
             throw new IllegalStateException("No adaptive method exist on extension " + type.getName() + ", refuse to create the adaptive class!");
         }
@@ -113,6 +114,7 @@ public class AdaptiveClassCodeGenerator {
         if (sort) {
             Arrays.sort(methods, Comparator.comparing(Method::toString));
         }
+        // 生成每个方法
         for (Method method : methods) {
             code.append(generateMethod(method));
         }
@@ -176,6 +178,8 @@ public class AdaptiveClassCodeGenerator {
     private String generateMethod(Method method) {
         String methodReturnType = method.getReturnType().getCanonicalName();
         String methodName = method.getName();
+
+        // 生成方法内容！！！
         String methodContent = generateMethodContent(method);
         String methodArgs = generateMethodArguments(method);
         String methodThrows = generateMethodThrows(method);
@@ -232,12 +236,14 @@ public class AdaptiveClassCodeGenerator {
                 code.append(generateUrlAssignmentIndirectly(method));
             }
 
+            // Adaptive注解值
             String[] value = getMethodAdaptiveValue(adaptiveAnnotation);
 
             boolean hasInvocation = hasInvocationArgument(method);
 
             code.append(generateInvocationArgumentNullCheck(method));
 
+            // 获取插件名称
             code.append(generateExtNameAssignment(value, hasInvocation));
             // check extName == null?
             code.append(generateExtNameNullCheck(value));

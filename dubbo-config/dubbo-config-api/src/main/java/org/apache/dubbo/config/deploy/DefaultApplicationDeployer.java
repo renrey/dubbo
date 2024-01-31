@@ -551,6 +551,7 @@ public class DefaultApplicationDeployer extends AbstractDeployer<ApplicationMode
 
                 initialize();
 
+                // 执行开始
                 doStart();
             } catch (Throwable e) {
                 onFailed(getIdentifier() + " start failure", e);
@@ -626,6 +627,9 @@ public class DefaultApplicationDeployer extends AbstractDeployer<ApplicationMode
 
         // always start metadata service on application model start, so it's ready whenever a new module is started
         // export MetadataService
+        /**
+         * export 元数据
+         */
         exportMetadataService();
 
         if (hasPreparedApplicationInstance.get()) {

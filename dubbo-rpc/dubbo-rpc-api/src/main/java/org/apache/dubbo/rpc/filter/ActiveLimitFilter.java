@@ -52,6 +52,7 @@ public class ActiveLimitFilter implements Filter, Filter.Listener {
         String methodName = invocation.getMethodName();
         int max = invoker.getUrl().getMethodParameter(methodName, ACTIVES_KEY, 0);
         final RpcStatus rpcStatus = RpcStatus.getStatus(invoker.getUrl(), invocation.getMethodName());
+        // 计算+1不成功，被限制了
         if (!RpcStatus.beginCount(url, methodName, max)) {
             long timeout = invoker.getUrl().getMethodParameter(invocation.getMethodName(), TIMEOUT_KEY, 0);
             long start = System.currentTimeMillis();
@@ -87,6 +88,7 @@ public class ActiveLimitFilter implements Filter, Filter.Listener {
         URL url = invoker.getUrl();
         int max = invoker.getUrl().getMethodParameter(methodName, ACTIVES_KEY, 0);
 
+        // 返回响应-1
         RpcStatus.endCount(url, methodName, getElapsed(invocation), true);
         notifyFinish(RpcStatus.getStatus(url, methodName), max);
     }

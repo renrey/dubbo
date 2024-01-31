@@ -36,6 +36,7 @@ import org.apache.dubbo.registry.client.ServiceDiscoveryRegistryDirectory;
 import org.apache.dubbo.registry.client.migration.MigrationClusterInvoker;
 import org.apache.dubbo.registry.client.migration.ServiceDiscoveryMigrationInvoker;
 import org.apache.dubbo.registry.retry.ReExportTask;
+import org.apache.dubbo.registry.support.FailbackRegistry;
 import org.apache.dubbo.registry.support.SkipFailbackWrapperException;
 import org.apache.dubbo.rpc.Exporter;
 import org.apache.dubbo.rpc.Invoker;
@@ -234,14 +235,36 @@ public class RegistryProtocol implements Protocol, ScopeModelAware {
 
         providerUrl = overrideUrlWithConfig(providerUrl, overrideSubscribeListener);
         //export invoker
+        /**
+         *          * 默认使用dubbo协议，invoker保存的url里protocol为其他，则调用的对应的实现类
+         *         export操作会开启服务端口
+         *          @see org.apache.dubbo.rpc.protocol.dubbo.DubboProtocol#export(Invoker) dubbo协议
+         *          @see org.apache.dubbo.rpc.protocol.rest.RestProtocol#doExport(Object, Class, URL) Rest协议
+         */
         final ExporterChangeableWrapper<T> exporter = doLocalExport(originInvoker, providerUrl);
 
         // url to registry
+        /**
+         * 获取注册中心实例（根据注册中心url）
+         */
         final Registry registry = getRegistry(registryUrl);
+        // 把provider url转成对应注册中心的
         final URL registeredProviderUrl = getUrlToRegistry(providerUrl, registryUrl);
 
         // decide if we need to delay publish
         boolean register = providerUrl.getParameter(REGISTER_KEY, true);
+        /**
+         * 注册到具体提供者service url到注册中心
+         * 注意是registry的spi才会注册
+         *
+         * service-discovery-registry是走
+         * org.apache.dubbo.registry.client.ServiceDiscoveryRegistry#register(org.apache.dubbo.common.URL)
+         *
+         *registry是走
+         * @see FailbackRegistry#register(URL)->
+         * zk实现
+         * @see org.apache.dubbo.registry.zookeeper.ZookeeperRegistry#doRegister(org.apache.dubbo.common.URL)
+         */
         if (register) {
             register(registry, registeredProviderUrl);
         }
@@ -387,6 +410,7 @@ public class RegistryProtocol implements Protocol, ScopeModelAware {
      * @return
      */
     protected Registry getRegistry(final URL registryUrl) {
+        //
         RegistryFactory registryFactory = ScopeModelUtil.getExtensionLoader(RegistryFactory.class, registryUrl.getScopeModel()).getAdaptiveExtension();
         return registryFactory.getRegistry(registryUrl);
     }
@@ -482,6 +506,7 @@ public class RegistryProtocol implements Protocol, ScopeModelAware {
         }
 
         Cluster cluster = Cluster.getCluster(url.getScopeModel(), qs.get(CLUSTER_KEY));
+        // do
         return doRefer(cluster, registry, type, url, qs);
     }
 

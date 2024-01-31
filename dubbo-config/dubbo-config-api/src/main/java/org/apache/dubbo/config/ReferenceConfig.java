@@ -32,6 +32,7 @@ import org.apache.dubbo.config.annotation.Reference;
 import org.apache.dubbo.config.support.Parameter;
 import org.apache.dubbo.config.utils.ConfigValidationUtils;
 import org.apache.dubbo.registry.client.metadata.MetadataUtils;
+import org.apache.dubbo.registry.integration.RegistryProtocol;
 import org.apache.dubbo.rpc.Invoker;
 import org.apache.dubbo.rpc.Protocol;
 import org.apache.dubbo.rpc.ProxyFactory;
@@ -213,6 +214,9 @@ public class ReferenceConfig<T> extends ReferenceConfigBase<T> {
 
             synchronized (this) {
                 if (ref == null) {
+                    /**
+                     * 执行初始化
+                     */
                     init();
                 }
             }
@@ -272,6 +276,9 @@ public class ReferenceConfig<T> extends ReferenceConfigBase<T> {
 
         serviceMetadata.getAttachments().putAll(referenceParameters);
 
+        /**
+         * 创建本接口的代理类
+         */
         ref = createProxy(referenceParameters);
 
         serviceMetadata.setTarget(ref);
@@ -383,6 +390,9 @@ public class ReferenceConfig<T> extends ReferenceConfigBase<T> {
                     aggregateUrlFromRegistry(referenceParameters);
                 }
             }
+            /**
+             * 创建invoker
+             */
             createInvokerForRemote();
         }
 
@@ -396,6 +406,9 @@ public class ReferenceConfig<T> extends ReferenceConfigBase<T> {
         consumerUrl = consumerUrl.setServiceModel(consumerModel);
         MetadataUtils.publishServiceDefinition(consumerUrl);
 
+        /**
+         * 创建代码中使用的代理类
+         */
         // create service proxy
         return (T) proxyFactory.getProxy(invoker, ProtocolUtils.isGeneric(generic));
     }
@@ -476,14 +489,19 @@ public class ReferenceConfig<T> extends ReferenceConfigBase<T> {
      */
     @SuppressWarnings({"unchecked", "rawtypes"})
     private void createInvokerForRemote() {
+        // 单注册
         if (urls.size() == 1) {
             URL curUrl = urls.get(0);
+            /**
+             * @see RegistryProtocol#refer(Class, URL)
+             */
             invoker = protocolSPI.refer(interfaceClass,curUrl);
             if (!UrlUtils.isRegistry(curUrl)){
                 List<Invoker<?>> invokers = new ArrayList<>();
                 invokers.add(invoker);
                 invoker = Cluster.getCluster(scopeModel, Cluster.DEFAULT).join(new StaticDirectory(curUrl, invokers), true);
             }
+        // 多注册
         } else {
             List<Invoker<?>> invokers = new ArrayList<>();
             URL registryUrl = null;

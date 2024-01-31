@@ -34,7 +34,7 @@ import static org.apache.dubbo.common.utils.PojoUtils.updatePropertyIfAbsent;
 
 /**
  * RegistryConfig
- *
+ * 注册中心配置
  * @export
  */
 public class RegistryConfig extends AbstractConfig {

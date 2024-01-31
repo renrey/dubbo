@@ -127,6 +127,11 @@ public class ZookeeperRegistry extends CacheableFailbackRegistry {
     public void doRegister(URL url) {
         try {
             checkDestroyed();
+            // 创建
+            // 默认是临时节点
+            /**
+             * /dubbo/Service名/providers/url内容
+             */
             zkClient.create(toUrlPath(url), url.getParameter(DYNAMIC_KEY, true));
         } catch (Throwable e) {
             throw new RpcException("Failed to register " + url + " to zookeeper " + getUrl() + ", cause: " + e.getMessage(), e);

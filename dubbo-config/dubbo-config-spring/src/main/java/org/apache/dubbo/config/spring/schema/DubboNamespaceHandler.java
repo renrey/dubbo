@@ -52,19 +52,19 @@ public class DubboNamespaceHandler extends NamespaceHandlerSupport implements Co
 
     @Override
     public void init() {
-        registerBeanDefinitionParser("application", new DubboBeanDefinitionParser(ApplicationConfig.class));
+        registerBeanDefinitionParser("application", new DubboBeanDefinitionParser(ApplicationConfig.class));// 当前应用
         registerBeanDefinitionParser("module", new DubboBeanDefinitionParser(ModuleConfig.class));
-        registerBeanDefinitionParser("registry", new DubboBeanDefinitionParser(RegistryConfig.class));
+        registerBeanDefinitionParser("registry", new DubboBeanDefinitionParser(RegistryConfig.class));//注册中心
         registerBeanDefinitionParser("config-center", new DubboBeanDefinitionParser(ConfigCenterBean.class));
         registerBeanDefinitionParser("metadata-report", new DubboBeanDefinitionParser(MetadataReportConfig.class));
         registerBeanDefinitionParser("monitor", new DubboBeanDefinitionParser(MonitorConfig.class));
         registerBeanDefinitionParser("metrics", new DubboBeanDefinitionParser(MetricsConfig.class));
         registerBeanDefinitionParser("ssl", new DubboBeanDefinitionParser(SslConfig.class));
-        registerBeanDefinitionParser("provider", new DubboBeanDefinitionParser(ProviderConfig.class));
-        registerBeanDefinitionParser("consumer", new DubboBeanDefinitionParser(ConsumerConfig.class));
-        registerBeanDefinitionParser("protocol", new DubboBeanDefinitionParser(ProtocolConfig.class));
-        registerBeanDefinitionParser("service", new DubboBeanDefinitionParser(ServiceBean.class));
-        registerBeanDefinitionParser("reference", new DubboBeanDefinitionParser(ReferenceBean.class));
+        registerBeanDefinitionParser("provider", new DubboBeanDefinitionParser(ProviderConfig.class));//提供者
+        registerBeanDefinitionParser("consumer", new DubboBeanDefinitionParser(ConsumerConfig.class));//消费者
+        registerBeanDefinitionParser("protocol", new DubboBeanDefinitionParser(ProtocolConfig.class));//协议
+        registerBeanDefinitionParser("service", new DubboBeanDefinitionParser(ServiceBean.class));//提供服务
+        registerBeanDefinitionParser("reference", new DubboBeanDefinitionParser(ReferenceBean.class));//引用消费服务
         registerBeanDefinitionParser("annotation", new AnnotationBeanDefinitionParser());
     }
 

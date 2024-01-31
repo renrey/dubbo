@@ -77,20 +77,25 @@ public class ExtensionDirector implements ExtensionAccessor {
         }
 
         // 1. find in local cache
+        // 查找是否已加载过
         ExtensionLoader<T> loader = (ExtensionLoader<T>) extensionLoadersMap.get(type);
 
         ExtensionScope scope = extensionScopeMap.get(type);
+        // 缓存当前class中SPI的scope属性
         if (scope == null) {
             SPI annotation = type.getAnnotation(SPI.class);
             scope = annotation.scope();
             extensionScopeMap.put(type, scope);
         }
 
+        // 未创建过且scope为self
+        // 创建新的loader
         if (loader == null && scope == ExtensionScope.SELF) {
             // create an instance in self scope
             loader = createExtensionLoader0(type);
         }
 
+        // 不然先在parent找
         // 2. find in parent
         if (loader == null) {
             if (this.parent != null) {
@@ -98,6 +103,9 @@ public class ExtensionDirector implements ExtensionAccessor {
             }
         }
 
+        /**
+         * 都不行，创建
+         */
         // 3. create it
         if (loader == null) {
             loader = createExtensionLoader(type);
@@ -120,6 +128,7 @@ public class ExtensionDirector implements ExtensionAccessor {
     private <T> ExtensionLoader<T> createExtensionLoader0(Class<T> type) {
         checkDestroyed();
         ExtensionLoader<T> loader;
+        //新建ExtensionLoader，放入缓存
         extensionLoadersMap.putIfAbsent(type, new ExtensionLoader<T>(type, this, scopeModel));
         loader = (ExtensionLoader<T>) extensionLoadersMap.get(type);
         return loader;

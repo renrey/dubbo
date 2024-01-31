@@ -83,6 +83,9 @@ public abstract class AbstractRegistryFactory implements RegistryFactory, ScopeM
                 return registry;
             }
             //create registry by spi/ioc
+            /**
+             * 创建注册中心实例
+             */
             registry = createRegistry(url);
         } catch (Exception e) {
             if (check) {

@@ -36,6 +36,7 @@ import org.apache.dubbo.metadata.MetadataService;
 import org.apache.dubbo.metadata.ServiceNameMapping;
 import org.apache.dubbo.metadata.WritableMetadataService;
 import org.apache.dubbo.registry.client.metadata.MetadataUtils;
+import org.apache.dubbo.registry.integration.RegistryProtocol;
 import org.apache.dubbo.rpc.Exporter;
 import org.apache.dubbo.rpc.Invoker;
 import org.apache.dubbo.rpc.Protocol;
@@ -46,6 +47,7 @@ import org.apache.dubbo.rpc.model.ModuleServiceRepository;
 import org.apache.dubbo.rpc.model.ProviderModel;
 import org.apache.dubbo.rpc.model.ScopeModel;
 import org.apache.dubbo.rpc.model.ServiceDescriptor;
+import org.apache.dubbo.rpc.proxy.javassist.JavassistProxyFactory;
 import org.apache.dubbo.rpc.service.GenericService;
 import org.apache.dubbo.rpc.support.ProtocolUtils;
 
@@ -231,9 +233,13 @@ public class ServiceConfig<T> extends ServiceConfigBase<T> {
             if (this.shouldExport()) {
                 this.init();
 
+                // 是否异步export
                 if (shouldDelay()) {
                     doDelayExport();
                 } else {
+                    /**
+                     * 执行
+                     */
                     doExport();
                 }
             }
@@ -360,7 +366,13 @@ public class ServiceConfig<T> extends ServiceConfigBase<T> {
         if (StringUtils.isEmpty(path)) {
             path = interfaceName;
         }
+        // 执行export
+        /**
+         * 暴露接口，即初始化服务器
+         */
         doExportUrls();
+        // 完成后执行
+
         exported();
     }
 
@@ -377,18 +389,34 @@ public class ServiceConfig<T> extends ServiceConfigBase<T> {
 
         repository.registerProvider(providerModel);
 
+        /**
+         * 加载注册中心链接
+         * 多注册中心！！！
+         *
+         * 默认情况下（单个的时候）：会有2个协议url
+         * registry、service-discovery-registry
+         */
         List<URL> registryURLs = ConfigValidationUtils.loadRegistries(this, true);
 
+        // 根据service上配置的多种协议
         for (ProtocolConfig protocolConfig : protocols) {
+            // 拼接当前协议url当前service的url
             String pathKey = URL.buildKey(getContextPath(protocolConfig)
                     .map(p -> p + "/" + path)
                     .orElse(path), group, version);
             // In case user specified path, register service one more time to map it to path.
+            // 根据到到path，注册service到本地缓缓存
             repository.registerService(pathKey, interfaceClass);
+            // 生成最终的导出协议url
             doExportUrlsFor1Protocol(protocolConfig, registryURLs);
         }
     }
 
+    /**
+     * 组装协议URL
+     * @param protocolConfig
+     * @param registryURLs
+     */
     private void doExportUrlsFor1Protocol(ProtocolConfig protocolConfig, List<URL> registryURLs) {
         Map<String, String> map = buildAttributes(protocolConfig);
 
@@ -397,8 +425,10 @@ public class ServiceConfig<T> extends ServiceConfigBase<T> {
         //init serviceMetadata attachments
         serviceMetadata.getAttachments().putAll(map);
 
+        // 本地协议生成
         URL url = buildUrl(protocolConfig, registryURLs, map);
 
+        // 导出
         exportUrl(url, registryURLs);
     }
 
@@ -562,11 +592,13 @@ public class ServiceConfig<T> extends ServiceConfigBase<T> {
         // don't export when none is configured
         if (!SCOPE_NONE.equalsIgnoreCase(scope)) {
 
+            // 本地导出
             // export to local if the config is not remote (export to remote only when config is remote)
             if (!SCOPE_REMOTE.equalsIgnoreCase(scope)) {
                 exportLocal(url);
             }
 
+            //对多个注册中心 远程导出当前protocol的url
             // export to remote if the config is not local (export to local only when config is local)
             if (!SCOPE_LOCAL.equalsIgnoreCase(scope)) {
                 url = exportRemote(url, registryURLs);
@@ -574,11 +606,13 @@ public class ServiceConfig<T> extends ServiceConfigBase<T> {
             }
 
         }
+        // 保存url
         this.urls.add(url);
     }
 
     private URL exportRemote(URL url, List<URL> registryURLs) {
         if (CollectionUtils.isNotEmpty(registryURLs)) {
+            // 遍历多个注册中心url
             for (URL registryURL : registryURLs) {
                 if (SERVICE_REGISTRY_PROTOCOL.equals(registryURL.getProtocol())) {
                     url = url.addParameterIfAbsent(SERVICE_NAME_MAPPING_KEY, "true");
@@ -590,12 +624,14 @@ public class ServiceConfig<T> extends ServiceConfigBase<T> {
                 }
 
                 url = url.addParameterIfAbsent(DYNAMIC_KEY, registryURL.getParameter(DYNAMIC_KEY));
+                // monitor的地址
                 URL monitorUrl = ConfigValidationUtils.loadMonitor(this, registryURL);
                 if (monitorUrl != null) {
                     url = url.putAttribute(MONITOR_KEY, monitorUrl);
                 }
 
                 // For providers, this is used to enable custom proxy to generate invoker
+                // 代理类的方式参数
                 String proxy = url.getParameter(PROXY_KEY);
                 if (StringUtils.isNotEmpty(proxy)) {
                     registryURL = registryURL.addParameter(PROXY_KEY, proxy);
@@ -609,6 +645,7 @@ public class ServiceConfig<T> extends ServiceConfigBase<T> {
                     }
                 }
 
+                // 先将当前协议的service的url放入注册中心url的参数中
                 doExportUrl(registryURL.putAttribute(EXPORT_KEY, url), true);
             }
 
@@ -631,10 +668,24 @@ public class ServiceConfig<T> extends ServiceConfigBase<T> {
 
     @SuppressWarnings({"unchecked", "rawtypes"})
     private void doExportUrl(URL url, boolean withMetaData) {
+        // 生成invoker代理对象
+        /**
+         * 代理类默认：
+         * @see JavassistProxyFactory#getInvoker(Object, Class, URL)
+         *
+         * url用于缓存当前协议、当前注册中心下当前serivce的url，也就是对应的具体配置
+         */
         Invoker<?> invoker = proxyFactory.getInvoker(ref, (Class) interfaceClass, url);
         if (withMetaData) {
             invoker = new DelegateProviderMetaDataInvoker(invoker, this);
         }
+        /**
+         * @see org.apache.dubbo.rpc.Protocol$Adaptive#export(Invoker) 具体自适应类
+         *
+         * 先调用RegistryProtocol#export 进行注册中心注册
+         * @see RegistryProtocol#export(Invoker)
+
+         */
         Exporter<?> exporter = protocolSPI.export(invoker);
         exporters.add(exporter);
     }

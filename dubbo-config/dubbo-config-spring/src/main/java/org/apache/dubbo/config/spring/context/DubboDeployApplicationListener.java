@@ -105,6 +105,9 @@ public class DubboDeployApplicationListener implements ApplicationListener<Appli
         ModuleDeployer deployer = moduleModel.getDeployer();
         Assert.notNull(deployer, "Module deployer is null");
         // start module
+        /**
+         * 启动
+         */
         Future future = deployer.start();
 
         // if the module does not start in background, await finish
