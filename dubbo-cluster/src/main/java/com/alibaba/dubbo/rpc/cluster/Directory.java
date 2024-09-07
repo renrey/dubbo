@@ -27,7 +27,7 @@ import java.util.List;
  * Directory. (SPI, Prototype, ThreadSafe)
  * <p>
  * <a href="http://en.wikipedia.org/wiki/Directory_service">Directory Service</a>
- *
+ * 目录服务，也可以叫name 服务，作用就是保存到节点的映射
  * @see com.alibaba.dubbo.rpc.cluster.Cluster#join(Directory)
  */
 public interface Directory<T> extends Node {

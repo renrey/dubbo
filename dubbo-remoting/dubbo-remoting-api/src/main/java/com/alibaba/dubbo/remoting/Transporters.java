@@ -72,6 +72,8 @@ public class Transporters {
         } else {
             handler = new ChannelHandlerDispatcher(handlers);
         }
+
+        // 这里使用Transporter进行连接，例如netty就会创建netty client
         return getTransporter().connect(url, handler);
     }
 

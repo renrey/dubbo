@@ -27,14 +27,18 @@ import java.util.List;
 /**
  * AdaptiveExtensionFactory
  */
+// 直接整个就是ExtensionFactory的自适应类
 @Adaptive
 public class AdaptiveExtensionFactory implements ExtensionFactory {
 
     private final List<ExtensionFactory> factories;
 
     public AdaptiveExtensionFactory() {
+        // 等于创建ExtensionLoader
         ExtensionLoader<ExtensionFactory> loader = ExtensionLoader.getExtensionLoader(ExtensionFactory.class);
         List<ExtensionFactory> list = new ArrayList<ExtensionFactory>();
+
+        // 加载所有AdaptiveExtensionFactory文件的spi
         for (String name : loader.getSupportedExtensions()) {
             list.add(loader.getExtension(name));
         }

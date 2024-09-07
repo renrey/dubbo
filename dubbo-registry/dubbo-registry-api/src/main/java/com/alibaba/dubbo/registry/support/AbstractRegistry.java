@@ -26,6 +26,7 @@ import com.alibaba.dubbo.common.utils.NamedThreadFactory;
 import com.alibaba.dubbo.common.utils.UrlUtils;
 import com.alibaba.dubbo.registry.NotifyListener;
 import com.alibaba.dubbo.registry.Registry;
+import com.alibaba.dubbo.registry.integration.RegistryDirectory;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -387,6 +388,7 @@ public abstract class AbstractRegistry implements Registry {
             logger.info("Notify urls for subscribe url " + url + ", urls: " + urls);
         }
         Map<String, List<URL>> result = new HashMap<String, List<URL>>();
+        // 过滤符合url的
         for (URL u : urls) {
             if (UrlUtils.isMatch(url, u)) {
                 String category = u.getParameter(Constants.CATEGORY_KEY, Constants.DEFAULT_CATEGORY);
@@ -401,16 +403,28 @@ public abstract class AbstractRegistry implements Registry {
         if (result.size() == 0) {
             return;
         }
+        // 等于这个notified有 当前消费者url到 对应分类信息（provider、router）映射
         Map<String, List<URL>> categoryNotified = notified.get(url);
         if (categoryNotified == null) {
             notified.putIfAbsent(url, new ConcurrentHashMap<String, List<URL>>());
             categoryNotified = notified.get(url);
         }
+
+        // 遍历符合分类结果
         for (Map.Entry<String, List<URL>> entry : result.entrySet()) {
             String category = entry.getKey();
             List<URL> categoryList = entry.getValue();
+            // 放入缓存
             categoryNotified.put(category, categoryList);
+
+            // 在本地保存当前消费协议url的 缓存 文件 -》用来重启恢复，有可用
             saveProperties(url);
+
+            /**
+             * 命名目录
+             * @see RegistryDirectory#notify(List)
+             * 生成发送rpc请求的invoker
+             */
             listener.notify(categoryList);
         }
     }

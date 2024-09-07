@@ -36,7 +36,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 final class ReferenceCountExchangeClient implements ExchangeClient {
 
     private final URL url;
-    private final AtomicInteger refenceCount = new AtomicInteger(0);
+    private final AtomicInteger refenceCount = new AtomicInteger(0);// 就是看共享连接客户端有多少个service在用，引用计数
 
     //    private final ExchangeHandler handler;
     private final ConcurrentMap<String, LazyConnectExchangeClient> ghostClientMap;
@@ -45,7 +45,7 @@ final class ReferenceCountExchangeClient implements ExchangeClient {
 
     public ReferenceCountExchangeClient(ExchangeClient client, ConcurrentMap<String, LazyConnectExchangeClient> ghostClientMap) {
         this.client = client;
-        refenceCount.incrementAndGet();
+        refenceCount.incrementAndGet();// 等于默认有1
         this.url = client.getUrl();
         if (ghostClientMap == null) {
             throw new IllegalStateException("ghostClientMap can not be null, url: " + url);

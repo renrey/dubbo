@@ -67,9 +67,11 @@ public class DubboRegistry extends FailbackRegistry {
 
     public DubboRegistry(Invoker<RegistryService> registryInvoker, RegistryService registryService) {
         super(registryInvoker.getUrl());
-        this.registryInvoker = registryInvoker;
-        this.registryService = registryService;
+        this.registryInvoker = registryInvoker;// 对应包含invoker的cluster
+        this.registryService = registryService;// 注册中心的操作实现
         // Start reconnection timer
+
+        // 定时重连
         this.reconnectPeriod = registryInvoker.getUrl().getParameter(Constants.REGISTRY_RECONNECT_PERIOD_KEY, RECONNECT_PERIOD_DEFAULT);
         reconnectFuture = reconnectTimer.scheduleWithFixedDelay(new Runnable() {
             @Override

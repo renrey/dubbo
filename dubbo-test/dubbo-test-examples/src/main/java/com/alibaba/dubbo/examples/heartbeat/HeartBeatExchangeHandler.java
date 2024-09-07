@@ -35,14 +35,15 @@ public class HeartBeatExchangeHandler extends HeaderExchangeHandler {
 
     @Override
     public void received(Channel channel, Object message) throws RemotingException {
+        // 收到消费方请求
         if (message instanceof Request) {
             Request req = (Request) message;
             if (req.isHeartbeat()) {
-                heartBeatCounter.incrementAndGet();
+                heartBeatCounter.incrementAndGet();// 计数+1
                 channel.setAttribute(KEY_READ_TIMESTAMP, System.currentTimeMillis());
                 Response res = new Response(req.getId(), req.getVersion());
                 res.setEvent(req.getData() == null ? null : req.getData().toString());
-                channel.send(res);
+                channel.send(res);// 发送那个响应
             }
         } else {
             super.received(channel, message);

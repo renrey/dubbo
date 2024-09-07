@@ -60,6 +60,7 @@ final class HeartBeatTask implements Runnable {
                         Request req = new Request();
                         req.setVersion(Version.getProtocolVersion());
                         req.setTwoWay(true);
+                        // heart beat事件
                         req.setEvent(Request.HEARTBEAT_EVENT);
                         channel.send(req);
                         if (logger.isDebugEnabled()) {

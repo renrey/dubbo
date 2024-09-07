@@ -125,6 +125,10 @@ public abstract class AnnotationInjectedBeanPostProcessor<A extends Annotation> 
 
         InjectionMetadata metadata = findInjectionMetadata(beanName, bean.getClass(), pvs);
         try {
+            // 注入
+            /**
+             * @see AnnotatedFieldElement#inject(Object, String, PropertyValues)
+             */
             metadata.inject(bean, beanName, pvs);
         } catch (BeanCreationException ex) {
             throw ex;
@@ -218,7 +222,9 @@ public abstract class AnnotationInjectedBeanPostProcessor<A extends Annotation> 
 
 
     private AnnotationInjectedBeanPostProcessor.AnnotatedInjectionMetadata buildAnnotatedMetadata(final Class<?> beanClass) {
+        // 注解属性
         Collection<AnnotationInjectedBeanPostProcessor.AnnotatedFieldElement> fieldElements = findFieldAnnotationMetadata(beanClass);
+        // 注解方法
         Collection<AnnotationInjectedBeanPostProcessor.AnnotatedMethodElement> methodElements = findAnnotatedMethodMetadata(beanClass);
         return new AnnotationInjectedBeanPostProcessor.AnnotatedInjectionMetadata(beanClass, fieldElements, methodElements);
 
@@ -226,6 +232,7 @@ public abstract class AnnotationInjectedBeanPostProcessor<A extends Annotation> 
 
     public InjectionMetadata findInjectionMetadata(String beanName, Class<?> clazz, PropertyValues pvs) {
         // Fall back to class name as cache key, for backwards compatibility with custom callers.
+        // 当前bean
         String cacheKey = (StringUtils.hasLength(beanName) ? beanName : clazz.getName());
         // Quick check on the concurrent map first, with minimal locking.
         AnnotationInjectedBeanPostProcessor.AnnotatedInjectionMetadata metadata = this.injectionMetadataCache.get(cacheKey);
@@ -237,7 +244,9 @@ public abstract class AnnotationInjectedBeanPostProcessor<A extends Annotation> 
                         metadata.clear(pvs);
                     }
                     try {
+                        // 在当前class上注册 当前目标的注解
                         metadata = buildAnnotatedMetadata(clazz);
+                        // 存放当前bean，用到的这个注解的地方（方式、属性，以反射形式记录）
                         this.injectionMetadataCache.put(cacheKey, metadata);
                     } catch (NoClassDefFoundError err) {
                         throw new IllegalStateException("Failed to introspect object class [" + clazz.getName() +
@@ -251,7 +260,10 @@ public abstract class AnnotationInjectedBeanPostProcessor<A extends Annotation> 
 
     @Override
     public void postProcessMergedBeanDefinition(RootBeanDefinition beanDefinition, Class<?> beanType, String beanName) {
+        // 创建bean后，注入属性前
         if (beanType != null) {
+            // 实际先生成当前bean引用了这个注解的地方（反射对象）的缓存映射
+            // 后面在postProcessPropertyValues时注入
             InjectionMetadata metadata = findInjectionMetadata(beanName, beanType, null);
             metadata.checkConfigMembers(beanDefinition);
         }
@@ -336,6 +348,7 @@ public abstract class AnnotationInjectedBeanPostProcessor<A extends Annotation> 
 
         Object injectedObject = injectedObjectsCache.get(cacheKey);
 
+        // 注入bean
         if (injectedObject == null) {
             injectedObject = doGetInjectedBean(annotation, bean, beanName, injectedType, injectedElement);
             // Customized inject-object if necessary
@@ -467,7 +480,7 @@ public abstract class AnnotationInjectedBeanPostProcessor<A extends Annotation> 
      */
     public class AnnotatedMethodElement extends InjectionMetadata.InjectedElement {
 
-        private final Method method;
+        private final Method method;// 反射
 
         private final A annotation;
 

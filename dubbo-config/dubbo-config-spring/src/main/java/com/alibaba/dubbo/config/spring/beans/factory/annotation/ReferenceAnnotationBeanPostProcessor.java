@@ -109,10 +109,12 @@ public class ReferenceAnnotationBeanPostProcessor extends AnnotationInjectedBean
 
         String referencedBeanName = buildReferencedBeanName(reference, injectedType);
 
+        // 生成ReferenceBean
         ReferenceBean referenceBean = buildReferenceBeanIfAbsent(referencedBeanName, reference, injectedType, getClassLoader());
 
         cacheInjectedReferenceBean(referenceBean, injectedElement);
 
+        // 创建代理对象 ——》通过ReferenceBean返回对象，进行调用
         Object proxy = buildProxy(referencedBeanName, referenceBean, injectedType);
 
         return proxy;
@@ -225,8 +227,10 @@ public class ReferenceAnnotationBeanPostProcessor extends AnnotationInjectedBean
 
     @Override
     public void onApplicationEvent(ApplicationEvent event) {
+        // 有serivceBean导出
         if (event instanceof ServiceBeanExportedEvent) {
             onServiceBeanExportEvent((ServiceBeanExportedEvent) event);
+        // spring全局刷新
         } else if (event instanceof ContextRefreshedEvent) {
             onContextRefreshedEvent((ContextRefreshedEvent) event);
         }

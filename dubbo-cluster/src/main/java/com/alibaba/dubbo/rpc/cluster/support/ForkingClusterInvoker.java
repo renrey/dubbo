@@ -47,6 +47,7 @@ public class ForkingClusterInvoker<T> extends AbstractClusterInvoker<T> {
      * Use {@link NamedInternalThreadFactory} to produce {@link com.alibaba.dubbo.common.threadlocal.InternalThread}
      * which with the use of {@link com.alibaba.dubbo.common.threadlocal.InternalThreadLocal} in {@link RpcContext}.
      */
+    // 使用缓存线程池：少用！！！
     private final ExecutorService executor = Executors.newCachedThreadPool(
             new NamedInternalThreadFactory("forking-cluster-timer", true));
 
@@ -62,9 +63,12 @@ public class ForkingClusterInvoker<T> extends AbstractClusterInvoker<T> {
             final List<Invoker<T>> selected;
             final int forks = getUrl().getParameter(Constants.FORKS_KEY, Constants.DEFAULT_FORKS);
             final int timeout = getUrl().getParameter(Constants.TIMEOUT_KEY, Constants.DEFAULT_TIMEOUT);
+
+            // 选择fork数量的provider
             if (forks <= 0 || forks >= invokers.size()) {
                 selected = invokers;
             } else {
+                // 当前可选provider多于 指定forks数，需要负载均衡选择
                 selected = new ArrayList<Invoker<T>>();
                 for (int i = 0; i < forks; i++) {
                     // TODO. Add some comment here, refer chinese version for more details.
@@ -76,7 +80,9 @@ public class ForkingClusterInvoker<T> extends AbstractClusterInvoker<T> {
             }
             RpcContext.getContext().setInvokers((List) selected);
             final AtomicInteger count = new AtomicInteger();
+            // 一个阻塞队列-》用于等待有结果返回
             final BlockingQueue<Object> ref = new LinkedBlockingQueue<Object>();
+            // 提交到缓存线程池，每个执行完成都是放入ref队列
             for (final Invoker<T> invoker : selected) {
                 executor.execute(new Runnable() {
                     @Override
@@ -93,6 +99,7 @@ public class ForkingClusterInvoker<T> extends AbstractClusterInvoker<T> {
                     }
                 });
             }
+            // 通过poll ref队列
             try {
                 Object ret = ref.poll(timeout, TimeUnit.MILLISECONDS);
                 if (ret instanceof Throwable) {

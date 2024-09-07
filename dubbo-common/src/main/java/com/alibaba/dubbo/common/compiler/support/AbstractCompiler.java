@@ -56,6 +56,7 @@ public abstract class AbstractCompiler implements Compiler {
                 throw new IllegalStateException("The java code not endsWith \"}\", code: \n" + code + "\n");
             }
             try {
+                // not found 才执行编译
                 return doCompile(className, code);
             } catch (RuntimeException t) {
                 throw t;

@@ -24,6 +24,7 @@ import com.alibaba.dubbo.remoting.RemotingException;
 import com.alibaba.dubbo.remoting.TimeoutException;
 import com.alibaba.dubbo.remoting.exchange.ExchangeClient;
 import com.alibaba.dubbo.remoting.exchange.ResponseFuture;
+import com.alibaba.dubbo.remoting.exchange.support.DefaultFuture;
 import com.alibaba.dubbo.rpc.Invocation;
 import com.alibaba.dubbo.rpc.Invoker;
 import com.alibaba.dubbo.rpc.Result;
@@ -81,17 +82,21 @@ public class DubboInvoker<T> extends AbstractInvoker<T> {
             boolean isAsync = RpcUtils.isAsync(getUrl(), invocation);
             boolean isOneway = RpcUtils.isOneway(getUrl(), invocation);
             int timeout = getUrl().getMethodParameter(methodName, Constants.TIMEOUT_KEY, Constants.DEFAULT_TIMEOUT);
-            if (isOneway) {
+            if (isOneway) {// 发送不关注结果
                 boolean isSent = getUrl().getMethodParameter(methodName, Constants.SENT_KEY, false);
                 currentClient.send(inv, isSent);
                 RpcContext.getContext().setFuture(null);
                 return new RpcResult();
-            } else if (isAsync) {
+            } else if (isAsync) {// 异步
                 ResponseFuture future = currentClient.request(inv, timeout);
-                RpcContext.getContext().setFuture(new FutureAdapter<Object>(future));
+                RpcContext.getContext().setFuture(new FutureAdapter<Object>(future));// 异步把futrue放入RpcContext
                 return new RpcResult();
-            } else {
+            } else {// 同步
                 RpcContext.getContext().setFuture(null);
+                // 实际同步就是阻塞future -》实际交给通信层HeaderExchangeClient
+                /**
+                 * @see DefaultFuture#get()
+                 */
                 return (Result) currentClient.request(inv, timeout).get();
             }
         } catch (TimeoutException e) {

@@ -98,6 +98,7 @@ final class HeaderExchangeChannel implements ExchangeChannel {
 
     @Override
     public ResponseFuture request(Object request) throws RemotingException {
+        // 先通过目标的url拿到超时参数
         return request(request, channel.getUrl().getPositiveParameter(Constants.TIMEOUT_KEY, Constants.DEFAULT_TIMEOUT));
     }
 
@@ -106,13 +107,16 @@ final class HeaderExchangeChannel implements ExchangeChannel {
         if (closed) {
             throw new RemotingException(this.getLocalAddress(), null, "Failed to send request " + request + ", cause: The channel " + this + " is closed!");
         }
-        // create request.
+        // create request.基础请求对象
         Request req = new Request();
         req.setVersion(Version.getProtocolVersion());
         req.setTwoWay(true);
-        req.setData(request);
+        req.setData(request);// 详细信息变成data
+
+        //包装future
         DefaultFuture future = new DefaultFuture(channel, req, timeout);
         try {
+            // 直接调用通信channel通信框架，例如netty channel ->就是writeandFlush，此时等于提交给netty线程执行（当前无需等待）
             channel.send(req);
         } catch (RemotingException e) {
             future.cancel();

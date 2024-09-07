@@ -126,11 +126,15 @@ public class RegistryProtocol implements Protocol {
 
     public void register(URL registryUrl, URL registedProviderUrl) {
         Registry registry = registryFactory.getRegistry(registryUrl);
+        /**
+         * @see com.alibaba.dubbo.registry.zookeeper.ZookeeperRegistry#doRegister(URL)
+         */
         registry.register(registedProviderUrl);
     }
 
     @Override
     public <T> Exporter<T> export(final Invoker<T> originInvoker) throws RpcException {
+        // 本地保存这个invoker
         //export invoker
         final ExporterChangeableWrapper<T> exporter = doLocalExport(originInvoker);
 
@@ -141,10 +145,13 @@ public class RegistryProtocol implements Protocol {
         final URL registeredProviderUrl = getRegisteredProviderUrl(originInvoker);
 
         //to judge to delay publish whether or not
+        // 是否配置开启注册
         boolean register = registeredProviderUrl.getParameter("register", true);
 
+        // 本地保存provider
         ProviderConsumerRegTable.registerProvider(originInvoker, registryUrl, registeredProviderUrl);
 
+        // 开始注册
         if (register) {
             register(registryUrl, registeredProviderUrl);
             ProviderConsumerRegTable.getProviderWrapper(originInvoker).setReg(true);
@@ -155,8 +162,12 @@ public class RegistryProtocol implements Protocol {
         final URL overrideSubscribeUrl = getSubscribedOverrideUrl(registeredProviderUrl);
         final OverrideListener overrideSubscribeListener = new OverrideListener(overrideSubscribeUrl, originInvoker);
         overrideListeners.put(overrideSubscribeUrl, overrideSubscribeListener);
+
+
         registry.subscribe(overrideSubscribeUrl, overrideSubscribeListener);
         //Ensure that a new exporter instance is returned every time export
+
+        // 返回export对象
         return new DestroyableExporter<T>(exporter, originInvoker, overrideSubscribeUrl, registeredProviderUrl);
     }
 
@@ -164,12 +175,19 @@ public class RegistryProtocol implements Protocol {
     private <T> ExporterChangeableWrapper<T> doLocalExport(final Invoker<T> originInvoker) {
         String key = getCacheKey(originInvoker);
         ExporterChangeableWrapper<T> exporter = (ExporterChangeableWrapper<T>) bounds.get(key);
+        // 新增
         if (exporter == null) {
             synchronized (bounds) {
                 exporter = (ExporterChangeableWrapper<T>) bounds.get(key);
                 if (exporter == null) {
+                    // 从注册url 获取当前provider url
                     final Invoker<?> invokerDelegete = new InvokerDelegete<T>(originInvoker, getProviderUrl(originInvoker));
+                    /**
+                     * dubbo通信协议注册
+                     * @see com.alibaba.dubbo.rpc.protocol.dubbo.DubboProtocol#export(Invoker)
+                     */
                     exporter = new ExporterChangeableWrapper<T>((Exporter<T>) protocol.export(invokerDelegete), originInvoker);
+                    // 保存本地bounds
                     bounds.put(key, exporter);
                 }
             }
@@ -248,11 +266,12 @@ public class RegistryProtocol implements Protocol {
      * @return
      */
     private URL getProviderUrl(final Invoker<?> origininvoker) {
+        // 把注册url的 export获取
         String export = origininvoker.getUrl().getParameterAndDecoded(Constants.EXPORT_KEY);
         if (export == null || export.length() == 0) {
             throw new IllegalArgumentException("The registry export url is null! registry: " + origininvoker.getUrl());
         }
-
+        // export具体就是 当前提供者地址
         URL providerUrl = URL.valueOf(export);
         return providerUrl;
     }
@@ -272,12 +291,18 @@ public class RegistryProtocol implements Protocol {
     @Override
     @SuppressWarnings("unchecked")
     public <T> Invoker<T> refer(Class<T> type, URL url) throws RpcException {
+        // url的协议头从registry改回 目标的类型，如zookeeper
         url = url.setProtocol(url.getParameter(Constants.REGISTRY_KEY, Constants.DEFAULT_REGISTRY)).removeParameter(Constants.REGISTRY_KEY);
+
+        // 通过url获取注册中心对象 （缓存）
         Registry registry = registryFactory.getRegistry(url);
+
+        // 代表本次是实例角色相关
         if (RegistryService.class.equals(type)) {
             return proxyFactory.getInvoker((T) registry, type, url);
         }
 
+        // 正常service的引用
         // group="a,b" or group="*"
         Map<String, String> qs = StringUtils.parseQueryString(url.getParameterAndDecoded(Constants.REFER_KEY));
         String group = qs.get(Constants.GROUP_KEY);
@@ -294,30 +319,56 @@ public class RegistryProtocol implements Protocol {
         return ExtensionLoader.getExtensionLoader(Cluster.class).getExtension("mergeable");
     }
 
+    // 等于消费者相关
     private <T> Invoker<T> doRefer(Cluster cluster, Registry registry, Class<T> type, URL url) {
+        // 目录服务对象-》地址映射、路由
         RegistryDirectory<T> directory = new RegistryDirectory<T>(type, url);
         directory.setRegistry(registry);
         directory.setProtocol(protocol);
+
         // all attributes of REFER_KEY
         Map<String, String> parameters = new HashMap<String, String>(directory.getUrl().getParameters());
+        // 生成执行订阅的消费者请求url
         URL subscribeUrl = new URL(Constants.CONSUMER_PROTOCOL, parameters.remove(Constants.REGISTER_IP_KEY), 0, type.getName(), parameters);
+
+        // 如果需要注册
         if (!Constants.ANY_VALUE.equals(url.getServiceInterface())
                 && url.getParameter(Constants.REGISTER_KEY, true)) {
-            URL registeredConsumerUrl = getRegisteredConsumerUrl(subscribeUrl, url);
+            URL registeredConsumerUrl = getRegisteredConsumerUrl(subscribeUrl, url);// 添加分类参数=consumers，用于注册
+            // 注册中心注册消费者!!!
+            /**
+             //
+             * zk：就是创建节点----》/dubbo/XXXservice/consumers/具体url协议
+             * @see com.alibaba.dubbo.registry.zookeeper.ZookeeperRegistry#doRegister(URL)
+             */
             registry.register(registeredConsumerUrl);
             directory.setRegisteredConsumerUrl(registeredConsumerUrl);
         }
+
+        // 往目录服务中订阅 providers、configurators、routers -》与服务路由查询相关
+        /**
+         * @see com.alibaba.dubbo.registry.zookeeper.ZookeeperRegistry#doSubscribe(URL, NotifyListener)
+         * 此时：
+         * 1. 保存目标provider信息到本地内存、本地缓存文件
+         * 2. 订阅目标service的provider等变化
+         * 3. directory中生成每个provider的invoker，负责发送rpc请求
+         */
         directory.subscribe(subscribeUrl.addParameter(Constants.CATEGORY_KEY,
                 Constants.PROVIDERS_CATEGORY
                         + "," + Constants.CONFIGURATORS_CATEGORY
                         + "," + Constants.ROUTERS_CATEGORY));
 
+        // invoker == cluster包装的 -》失败重试、广播、并行等，基于 目录服务的映射做执行选择
+        // 此时，invoker链路 ：cluster（选择请求方式） -》directoryinvoker（rpc请求）
         Invoker invoker = cluster.join(directory);
+
+        // 放入到本地，进行servicekey（可细分到版本、group） 到invoker映射
         ProviderConsumerRegTable.registerConsumer(invoker, url, subscribeUrl, directory);
         return invoker;
     }
 
     public URL getRegisteredConsumerUrl(final URL consumerUrl, URL registryUrl) {
+        // 1. 参数category= consumers
         return consumerUrl.addParameters(CATEGORY_KEY, CONSUMERS_CATEGORY,
                 CHECK_KEY, String.valueOf(false));
     }

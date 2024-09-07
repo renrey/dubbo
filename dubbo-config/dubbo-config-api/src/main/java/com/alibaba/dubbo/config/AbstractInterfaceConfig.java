@@ -106,10 +106,12 @@ public abstract class AbstractInterfaceConfig extends AbstractMethodConfig {
 
     protected void checkRegistry() {
         // for backward compatibility
+        // 注解方式下，通过dubbo.registry.address配置注册中心地址
         if (registries == null || registries.isEmpty()) {
             String address = ConfigUtils.getProperty("dubbo.registry.address");
             if (address != null && address.length() > 0) {
                 registries = new ArrayList<RegistryConfig>();
+                // 用| 分割
                 String[] as = address.split("\\s*[|]+\\s*");
                 for (String a : as) {
                     RegistryConfig registryConfig = new RegistryConfig();
@@ -159,7 +161,8 @@ public abstract class AbstractInterfaceConfig extends AbstractMethodConfig {
     }
 
     protected List<URL> loadRegistries(boolean provider) {
-        checkRegistry();
+        checkRegistry();// 注解方式下，加载注册中心地址
+        // 注册中心ulr
         List<URL> registryList = new ArrayList<URL>();
         if (registries != null && !registries.isEmpty()) {
             for (RegistryConfig config : registries) {
@@ -173,6 +176,7 @@ public abstract class AbstractInterfaceConfig extends AbstractMethodConfig {
                 }
                 if (address.length() > 0 && !RegistryConfig.NO_AVAILABLE.equalsIgnoreCase(address)) {
                     Map<String, String> map = new HashMap<String, String>();
+                    // 通过application、registryConfig放入到map
                     appendParameters(map, application);
                     appendParameters(map, config);
                     map.put("path", RegistryService.class.getName());
@@ -185,13 +189,18 @@ public abstract class AbstractInterfaceConfig extends AbstractMethodConfig {
                         if (ExtensionLoader.getExtensionLoader(RegistryFactory.class).hasExtension("remote")) {
                             map.put("protocol", "remote");
                         } else {
-                            map.put("protocol", "dubbo");
+                            map.put("protocol", "dubbo");// 注册中心地址协议 :默认dubbo协议
                         }
                     }
                     List<URL> urls = UrlUtils.parseURLs(address, map);
                     for (URL url : urls) {
+                        // url参数加入registry，值为url协议头-> 用于spi选择Protocol, 代表目标的类型，例如常用的zookeeper
                         url = url.addParameter(Constants.REGISTRY_KEY, url.getProtocol());
+
+                        // url的协议头变为registry -》代表url现在是注册中心详细配置
                         url = url.setProtocol(Constants.REGISTRY_PROTOCOL);
+
+                        // 提供者 如果设置了register=false、消费者subscribe=false，都无需注册中心？
                         if ((provider && url.getParameter(Constants.REGISTER_KEY, true))
                                 || (!provider && url.getParameter(Constants.SUBSCRIBE_KEY, true))) {
                             registryList.add(url);

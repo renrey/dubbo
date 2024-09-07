@@ -1229,6 +1229,7 @@ public final class URL implements Serializable {
         if (version != null && version.length() > 0) {
             buf.append(":").append(version);
         }
+        // 大概就是 XXservice/group(如果有配置):1.0（有配置版本）
         return buf.toString();
     }
 

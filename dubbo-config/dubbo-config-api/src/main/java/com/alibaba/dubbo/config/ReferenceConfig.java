@@ -29,16 +29,17 @@ import com.alibaba.dubbo.config.annotation.Reference;
 import com.alibaba.dubbo.config.model.ApplicationModel;
 import com.alibaba.dubbo.config.model.ConsumerModel;
 import com.alibaba.dubbo.config.support.Parameter;
+import com.alibaba.dubbo.registry.integration.RegistryProtocol;
 import com.alibaba.dubbo.registry.support.ConsumerInvokerWrapper;
 import com.alibaba.dubbo.registry.support.ProviderConsumerRegTable;
-import com.alibaba.dubbo.rpc.Invoker;
-import com.alibaba.dubbo.rpc.Protocol;
-import com.alibaba.dubbo.rpc.ProxyFactory;
-import com.alibaba.dubbo.rpc.StaticContext;
+import com.alibaba.dubbo.rpc.*;
 import com.alibaba.dubbo.rpc.cluster.Cluster;
+import com.alibaba.dubbo.rpc.cluster.Directory;
+import com.alibaba.dubbo.rpc.cluster.LoadBalance;
 import com.alibaba.dubbo.rpc.cluster.directory.StaticDirectory;
 import com.alibaba.dubbo.rpc.cluster.support.AvailableCluster;
 import com.alibaba.dubbo.rpc.cluster.support.ClusterUtils;
+import com.alibaba.dubbo.rpc.cluster.support.FailbackClusterInvoker;
 import com.alibaba.dubbo.rpc.protocol.injvm.InjvmProtocol;
 import com.alibaba.dubbo.rpc.service.GenericService;
 import com.alibaba.dubbo.rpc.support.ProtocolUtils;
@@ -80,7 +81,7 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
     // client type
     private String client;
     // url for peer-to-peer invocation
-    private String url;
+    private String url;// 指定目标具体提供者-》所以是点对点（p2p）
     // method configs
     private List<MethodConfig> methods;
     // default config
@@ -115,7 +116,9 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
     }
 
     public ReferenceConfig(Reference reference) {
-        appendAnnotation(Reference.class, reference);
+        appendAnnotation(Reference.class, reference);// 把注解值的set到当前config对象对应的属性中
+
+        // Reference中method的配置（当前service下具体方法的调用配置）设置到当前config
         setMethods(MethodConfig.constructMethodConfig(reference.methods()));
     }
 
@@ -164,6 +167,7 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
         if (destroyed) {
             throw new IllegalStateException("Already destroyed!");
         }
+        // 初始化
         if (ref == null) {
             init();
         }
@@ -187,7 +191,7 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
         ref = null;
     }
 
-    private void init() {
+    private void  init() {
         if (initialized) {
             return;
         }
@@ -201,6 +205,8 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
         if (getGeneric() == null && getConsumer() != null) {
             setGeneric(getConsumer().getGeneric());
         }
+
+        //接口类
         if (ProtocolUtils.isGeneric(getGeneric())) {
             interfaceClass = GenericService.class;
         } else {
@@ -250,6 +256,7 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
                 }
             }
         }
+        // 先是通用的consumer相关的
         if (consumer != null) {
             if (application == null) {
                 application = consumer.getApplication();
@@ -258,12 +265,14 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
                 module = consumer.getModule();
             }
             if (registries == null) {
-                registries = consumer.getRegistries();
+                registries = consumer.getRegistries();// 加载
             }
             if (monitor == null) {
                 monitor = consumer.getMonitor();
             }
         }
+
+        // 下面是自定义优先级更高
         if (module != null) {
             if (registries == null) {
                 registries = module.getRegistries();
@@ -305,6 +314,7 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
                 map.put("methods", StringUtils.join(new HashSet<String>(Arrays.asList(methods)), ","));
             }
         }
+        // url协议的，INTERFACE_KEY -》当前引用的接口
         map.put(Constants.INTERFACE_KEY, interfaceName);
         appendParameters(map, application);
         appendParameters(map, module);
@@ -325,6 +335,7 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
                 checkAndConvertImplicitConfig(method, map, attributes);
             }
         }
+        // 上面的等于把所有参数都放入map，等于用来转成url等
 
         String hostToRegistry = ConfigUtils.getSystemProperty(Constants.DUBBO_IP_TO_REGISTRY);
         if (hostToRegistry == null || hostToRegistry.length() == 0) {
@@ -336,6 +347,8 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
 
         //attributes are stored by system context.
         StaticContext.getSystemContext().putAll(attributes);
+
+        // 基于map创建代理
         ref = createProxy(map);
         ConsumerModel consumerModel = new ConsumerModel(getUniqueServiceName(), this, ref, interfaceClass.getMethods());
         ApplicationModel.initConsumerModel(getUniqueServiceName(), consumerModel);
@@ -345,10 +358,13 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
     private T createProxy(Map<String, String> map) {
         URL tmpUrl = new URL("temp", "localhost", 0, map);
         final boolean isJvmRefer;
-        if (isInjvm() == null) {
+
+        // 其实就是看有没有指定url ，且指定了localhost
+        if (isInjvm() == null) {// 新版的
+            // 点对点-》指定调用地址
             if (url != null && url.length() > 0) { // if a url is specified, don't do local reference
                 isJvmRefer = false;
-            } else if (InjvmProtocol.getInjvmProtocol().isInjvmRefer(tmpUrl)) {
+            } else if (InjvmProtocol.getInjvmProtocol().isInjvmRefer(tmpUrl)) {// 判断地址是否本地
                 // by default, reference local service if there is
                 isJvmRefer = true;
             } else {
@@ -359,14 +375,18 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
         }
 
         if (isJvmRefer) {
+            // 直接本地
             URL url = new URL(Constants.LOCAL_PROTOCOL, NetUtils.LOCALHOST, 0, interfaceClass.getName()).addParameters(map);
             invoker = refprotocol.refer(interfaceClass, url);
             if (logger.isInfoEnabled()) {
                 logger.info("Using injvm service " + interfaceClass.getName());
             }
         } else {
+            // 点对点调用
             if (url != null && url.length() > 0) { // user specified URL, could be peer-to-peer address, or register center's address.
-                String[] us = Constants.SEMICOLON_SPLIT_PATTERN.split(url);
+                String[] us = Constants.SEMICOLON_SPLIT_PATTERN.split(url);// 分割url
+
+                // 1个url可放多个地址（；做间隔）
                 if (us != null && us.length > 0) {
                     for (String u : us) {
                         URL url = URL.valueOf(u);
@@ -381,6 +401,9 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
                     }
                 }
             } else { // assemble URL from register center's configuration
+                // 需要从注册中心加载当前service的provider
+
+                // 1. 加载注册中心协议url -》原来的dubbo:registry只是配置，现在转成url协议
                 List<URL> us = loadRegistries(false);
                 if (us != null && !us.isEmpty()) {
                     for (URL u : us) {
@@ -388,6 +411,7 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
                         if (monitorUrl != null) {
                             map.put(Constants.MONITOR_KEY, URL.encode(monitorUrl.toFullString()));
                         }
+                        // 等于加入个url参数 refer= 当前map配置
                         urls.add(u.addParameterAndEncoded(Constants.REFER_KEY, StringUtils.toQueryString(map)));
                     }
                 }
@@ -396,22 +420,40 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
                 }
             }
 
+            // 点对点下，只配置1个url or 只有1个注册中心
             if (urls.size() == 1) {
+                /**
+                 * 点对点
+                 * @see com.alibaba.dubbo.rpc.protocol.dubbo.DubboProtocol#refer
+                 *
+                 * 配置了注册中心
+                 * @see RegistryProtocol#refer(Class, URL)
+                 */
                 invoker = refprotocol.refer(interfaceClass, urls.get(0));
             } else {
+                // 多注册中心 or 多点对点url
                 List<Invoker<?>> invokers = new ArrayList<Invoker<?>>();
                 URL registryURL = null;
                 for (URL url : urls) {
-                    invokers.add(refprotocol.refer(interfaceClass, url));
+                    invokers.add(refprotocol.refer(interfaceClass, url));// 也是跟单个一样生成invoker
+                    // 协议是注册中心
                     if (Constants.REGISTRY_PROTOCOL.equals(url.getProtocol())) {
                         registryURL = url; // use last registry url
                     }
                 }
+                // 注册中心url
                 if (registryURL != null) { // registry url is available
                     // use AvailableCluster only when register's cluster is available
-                    URL u = registryURL.addParameterIfAbsent(Constants.CLUSTER_KEY, AvailableCluster.NAME);
+                    URL u = registryURL.addParameterIfAbsent(Constants.CLUSTER_KEY, AvailableCluster.NAME);// 等于选择cluster使用available，其中注册中心地址使用最后1个
+
+                    /**
+                     * 前置执行先判断注册中心是否可用，不可用则下个，注意每次都是按原顺序，非轮询
+                     * @see AvailableCluster#join(Directory)
+                     */
                     invoker = cluster.join(new StaticDirectory(u, invokers));
                 } else { // not a registry url
+                    // 点对点
+                    // 这时候没配，默认是cluster时failback，就等于直接基于这些url执行负载均衡
                     invoker = cluster.join(new StaticDirectory(invokers));
                 }
             }
@@ -439,8 +481,20 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
         if (logger.isInfoEnabled()) {
             logger.info("Refer dubbo service " + interfaceClass.getName() + " from url " + invoker.getUrl());
         }
+
+        // 给当前service类创建代理对象，里面会根据java对象参数转出rpc对象，调用invoker!!!
         // create service proxy
         return (T) proxyFactory.getProxy(invoker);
+        // 业务使用的代理对象：
+        // 1. 业务转rpc：传入java对象、调用方法。转成rpc invocation ，调用Invoker
+        // 2. Invoker链 第一个 cluster ：分布式协调方式相关
+        /**
+         * 通用前置配置
+         * @see com.alibaba.dubbo.rpc.cluster.support.AbstractClusterInvoker#invoke
+         *
+         * 每个 cluster extensisons 独有调用
+         * @see FailbackClusterInvoker#doInvoke(Invocation, List, LoadBalance)
+         */
     }
 
     private void checkDefault() {

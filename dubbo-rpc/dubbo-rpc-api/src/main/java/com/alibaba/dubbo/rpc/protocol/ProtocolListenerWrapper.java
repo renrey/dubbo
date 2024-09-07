@@ -32,6 +32,7 @@ import java.util.Collections;
 
 /**
  * ListenerProtocol
+ * 这个等于对invoker执行完方法后的监听回调
  */
 public class ProtocolListenerWrapper implements Protocol {
 
@@ -51,9 +52,12 @@ public class ProtocolListenerWrapper implements Protocol {
 
     @Override
     public <T> Exporter<T> export(Invoker<T> invoker) throws RpcException {
+        // 注册中心，正常执行下一个
         if (Constants.REGISTRY_PROTOCOL.equals(invoker.getUrl().getProtocol())) {
             return protocol.export(invoker);
         }
+
+        // 执行invoker -》包装invoker 前面多1条执行ExporterListener的链路
         return new ListenerExporterWrapper<T>(protocol.export(invoker),
                 Collections.unmodifiableList(ExtensionLoader.getExtensionLoader(ExporterListener.class)
                         .getActivateExtension(invoker.getUrl(), Constants.EXPORTER_LISTENER_KEY)));
@@ -64,6 +68,7 @@ public class ProtocolListenerWrapper implements Protocol {
         if (Constants.REGISTRY_PROTOCOL.equals(url.getProtocol())) {
             return protocol.refer(type, url);
         }
+
         return new ListenerInvokerWrapper<T>(protocol.refer(type, url),
                 Collections.unmodifiableList(
                         ExtensionLoader.getExtensionLoader(InvokerListener.class)

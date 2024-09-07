@@ -31,6 +31,7 @@ import java.util.List;
 
 /**
  * ListenerProtocol
+ * 负责把filter加载到调用 rpc 请求invoker前的
  */
 public class ProtocolFilterWrapper implements Protocol {
 
@@ -50,6 +51,7 @@ public class ProtocolFilterWrapper implements Protocol {
             for (int i = filters.size() - 1; i >= 0; i--) {
                 final Filter filter = filters.get(i);
                 final Invoker<T> next = last;
+                // 就是链
                 last = new Invoker<T>() {
 
                     @Override

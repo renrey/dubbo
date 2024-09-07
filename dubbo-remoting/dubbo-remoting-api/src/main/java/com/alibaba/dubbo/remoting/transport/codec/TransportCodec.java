@@ -39,6 +39,7 @@ public class TransportCodec extends AbstractCodec {
     public void encode(Channel channel, ChannelBuffer buffer, Object message) throws IOException {
         OutputStream output = new ChannelBufferOutputStream(buffer);
         ObjectOutput objectOutput = getSerialization(channel).serialize(channel.getUrl(), output);
+        // 序列化data
         encodeData(channel, objectOutput, message);
         objectOutput.flushBuffer();
         if (objectOutput instanceof Cleanable) {

@@ -118,6 +118,7 @@ public class RpcContext {
      * @return context
      */
     public static RpcContext getContext() {
+        // 本地线程变量
         return LOCAL.get();
     }
 

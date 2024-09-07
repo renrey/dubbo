@@ -69,9 +69,9 @@ public class ExchangeCodec extends TelnetCodec {
 
     @Override
     public void encode(Channel channel, ChannelBuffer buffer, Object msg) throws IOException {
-        if (msg instanceof Request) {
+        if (msg instanceof Request) {// 請求
             encodeRequest(channel, buffer, (Request) msg);
-        } else if (msg instanceof Response) {
+        } else if (msg instanceof Response) {// 响应
             encodeResponse(channel, buffer, (Response) msg);
         } else {
             super.encode(channel, buffer, msg);

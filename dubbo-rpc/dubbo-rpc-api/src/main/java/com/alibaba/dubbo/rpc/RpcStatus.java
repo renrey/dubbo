@@ -85,6 +85,7 @@ public class RpcStatus {
      */
     public static RpcStatus getStatus(URL url, String methodName) {
         String uri = url.toIdentityString();
+        // map保存了当前service的信息
         ConcurrentMap<String, RpcStatus> map = METHOD_STATISTICS.get(uri);
         if (map == null) {
             METHOD_STATISTICS.putIfAbsent(uri, new ConcurrentHashMap<String, RpcStatus>());

@@ -104,6 +104,7 @@ public abstract class Wrapper {
 
         Wrapper ret = WRAPPER_MAP.get(c);
         if (ret == null) {
+            // 生成基于这个class的包装类，未使用代理类
             ret = makeWrapper(c);
             WRAPPER_MAP.put(c, ret);
         }

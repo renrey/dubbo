@@ -29,6 +29,7 @@ import com.alibaba.dubbo.rpc.Invoker;
 import com.alibaba.dubbo.rpc.Protocol;
 import com.alibaba.dubbo.rpc.ProxyFactory;
 import com.alibaba.dubbo.rpc.cluster.Cluster;
+import com.alibaba.dubbo.rpc.proxy.javassist.JavassistProxyFactory;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -75,25 +76,46 @@ public class DubboRegistryFactory extends AbstractRegistryFactory {
         this.cluster = cluster;
     }
 
+    // 创建注册中心对象
     @Override
     public Registry createRegistry(URL url) {
-        url = getRegistryURL(url);
+        url = getRegistryURL(url);// 协议url
+
+        // urls就是所有注册中心url
         List<URL> urls = new ArrayList<URL>();
         urls.add(url.removeParameter(Constants.BACKUP_KEY));
         String backup = url.getParameter(Constants.BACKUP_KEY);
+        // 如果注册中心url中有备用地址，把备用也加到urls集合中
         if (backup != null && backup.length() > 0) {
             String[] addresses = Constants.COMMA_SPLIT_PATTERN.split(backup);
             for (String address : addresses) {
-                urls.add(url.setAddress(address));
+                urls.add(url.setAddress(address));// 就是ip端口不同
             }
         }
         RegistryDirectory<RegistryService> directory = new RegistryDirectory<RegistryService>(RegistryService.class, url.addParameter(Constants.INTERFACE_KEY, RegistryService.class.getName()).addParameterAndEncoded(Constants.REFER_KEY, url.toParameterString()));
+
+        // 集群中执行策略的invoker对象 -- cluster -》如failfast、广播，负责执行rpc请求的cluster策略
+        /**
+         * @see com.alibaba.dubbo.rpc.cluster.support.FailoverCluster#join(com.alibaba.dubbo.rpc.cluster.Directory)
+         */
         Invoker<RegistryService> registryInvoker = cluster.join(directory);
+
+        // 创建代理对象 -》负责做service接口对象的代理类，本地调用 根据接口方法转成rpc请求，通过registryInvoker发送
+        /**
+         * @see JavassistProxyFactory
+         */
         RegistryService registryService = proxyFactory.getProxy(registryInvoker);
+
+        // 实际对外使用的dubbo registry对象
         DubboRegistry registry = new DubboRegistry(registryInvoker, registryService);
         directory.setRegistry(registry);
         directory.setProtocol(protocol);
+
+        // 根据（注册中心）urls 生成invoker
         directory.notify(urls);
+
+        // 可知：/dubbo/com.alibaba.dubbo.registry.RegistryService 就是所有客户端的管理
+        // 发起订阅 -》把当前客户端作为 消费者注册，path=RegistryService，参数为入参注册中心的url参数-- 即当前消费者的信息上报
         directory.subscribe(new URL(Constants.CONSUMER_PROTOCOL, NetUtils.getLocalHost(), 0, RegistryService.class.getName(), url.getParameters()));
         return registry;
     }

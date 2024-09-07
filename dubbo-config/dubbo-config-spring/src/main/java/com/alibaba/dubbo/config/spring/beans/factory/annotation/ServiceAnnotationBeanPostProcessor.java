@@ -129,8 +129,10 @@ public class ServiceAnnotationBeanPostProcessor implements BeanDefinitionRegistr
 
         scanner.setBeanNameGenerator(beanNameGenerator);
 
+        // 扫描器加入条件 -》service注解
         scanner.addIncludeFilter(new AnnotationTypeFilter(Service.class));
 
+        // 扫描
         for (String packageToScan : packagesToScan) {
 
             // Registers @Service Bean first
@@ -253,6 +255,7 @@ public class ServiceAnnotationBeanPostProcessor implements BeanDefinitionRegistr
 
         Class<?> interfaceClass = resolveServiceInterfaceClass(beanClass, service);
 
+        // 引用bean的名字
         String annotatedServiceBeanName = beanDefinitionHolder.getBeanName();
 
         AbstractBeanDefinition serviceBeanDefinition =
@@ -262,6 +265,7 @@ public class ServiceAnnotationBeanPostProcessor implements BeanDefinitionRegistr
         String beanName = generateServiceBeanName(service, interfaceClass, annotatedServiceBeanName);
 
         if (scanner.checkCandidate(beanName, serviceBeanDefinition)) { // check duplicated candidate bean
+            // 注册bean定义
             registry.registerBeanDefinition(beanName, serviceBeanDefinition);
 
             if (logger.isInfoEnabled()) {
@@ -376,6 +380,9 @@ public class ServiceAnnotationBeanPostProcessor implements BeanDefinitionRegistr
 
         propertyValues.addPropertyValues(new AnnotationPropertyValuesAdapter(service, environment, ignoreAttributeNames));
 
+        // 下面的都是根据注解定义的名字找到对应bean注入到ServiceBean
+
+        // 注入ref 源对象！！！
         // References "ref" property to annotated-@Service Bean
         addPropertyReference(builder, "ref", annotatedServiceBeanName);
         // Set interface

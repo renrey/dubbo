@@ -82,6 +82,7 @@ public abstract class AbstractRegistryFactory implements RegistryFactory {
 
     @Override
     public Registry getRegistry(URL url) {
+        // url加path添加RegistryService，interface参数=RegistryService
         url = url.setPath(RegistryService.class.getName())
                 .addParameter(Constants.INTERFACE_KEY, RegistryService.class.getName())
                 .removeParameters(Constants.EXPORT_KEY, Constants.REFER_KEY);
@@ -89,10 +90,19 @@ public abstract class AbstractRegistryFactory implements RegistryFactory {
         // Lock the registry access process to ensure a single instance of the registry
         LOCK.lock();
         try {
+            // 获取缓存中
             Registry registry = REGISTRIES.get(key);
             if (registry != null) {
                 return registry;
             }
+            // 创建注册中心对象
+            /**
+             * zk
+             * @see com.alibaba.dubbo.registry.zookeeper.ZookeeperRegistryFactory#createRegistry(URL)
+             *
+             *  nasoc
+             * @see com.alibaba.dubbo.registry.nacos.NacosRegistryFactory#createRegistry(URL)
+             */
             registry = createRegistry(url);
             if (registry == null) {
                 throw new IllegalStateException("Can not create registry " + url);

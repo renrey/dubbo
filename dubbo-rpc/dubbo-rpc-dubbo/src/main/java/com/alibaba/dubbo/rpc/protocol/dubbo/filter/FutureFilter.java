@@ -71,6 +71,7 @@ public class FutureFilter implements Filter {
     private void asyncCallback(final Invoker<?> invoker, final Invocation invocation) {
         Future<?> f = RpcContext.getContext().getFuture();
         if (f instanceof FutureAdapter) {
+            // exchange的future
             ResponseFuture future = ((FutureAdapter<?>) f).getFuture();
             future.setCallback(new ResponseCallback() {
                 @Override

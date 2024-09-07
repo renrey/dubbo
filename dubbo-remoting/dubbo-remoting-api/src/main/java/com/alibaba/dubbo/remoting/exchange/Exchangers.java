@@ -24,6 +24,7 @@ import com.alibaba.dubbo.remoting.ChannelHandler;
 import com.alibaba.dubbo.remoting.RemotingException;
 import com.alibaba.dubbo.remoting.exchange.support.ExchangeHandlerDispatcher;
 import com.alibaba.dubbo.remoting.exchange.support.Replier;
+import com.alibaba.dubbo.remoting.exchange.support.header.HeaderExchanger;
 import com.alibaba.dubbo.remoting.transport.ChannelHandlerAdapter;
 
 /**
@@ -106,10 +107,15 @@ public class Exchangers {
             throw new IllegalArgumentException("handler == null");
         }
         url = url.addParameterIfAbsent(Constants.CODEC_KEY, "exchange");
+
+        /**
+         * @see HeaderExchanger#connect(URL, ExchangeHandler)
+         */
         return getExchanger(url).connect(url, handler);
     }
 
     public static Exchanger getExchanger(URL url) {
+        // 交换器exchanger
         String type = url.getParameter(Constants.EXCHANGER_KEY, Constants.DEFAULT_EXCHANGER);
         return getExchanger(type);
     }

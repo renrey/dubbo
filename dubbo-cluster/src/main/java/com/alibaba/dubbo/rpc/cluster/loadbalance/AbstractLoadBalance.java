@@ -47,10 +47,12 @@ public abstract class AbstractLoadBalance implements LoadBalance {
     protected abstract <T> Invoker<T> doSelect(List<Invoker<T>> invokers, URL url, Invocation invocation);
 
     protected int getWeight(Invoker<?> invoker, Invocation invocation) {
+        // 默认100
         int weight = invoker.getUrl().getMethodParameter(invocation.getMethodName(), Constants.WEIGHT_KEY, Constants.DEFAULT_WEIGHT);
+        // 权重不是0，都进入
         if (weight > 0) {
             long timestamp = invoker.getUrl().getParameter(Constants.REMOTE_TIMESTAMP_KEY, 0L);
-            if (timestamp > 0L) {
+            if (timestamp > 0L) {// 默认没开启
                 int uptime = (int) (System.currentTimeMillis() - timestamp);
                 int warmup = invoker.getUrl().getParameter(Constants.WARMUP_KEY, Constants.DEFAULT_WARMUP);
                 if (uptime > 0 && uptime < warmup) {

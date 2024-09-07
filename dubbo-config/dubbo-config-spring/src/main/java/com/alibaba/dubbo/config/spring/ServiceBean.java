@@ -99,6 +99,7 @@ public class ServiceBean<T> extends ServiceConfig<T> implements InitializingBean
 
     @Override
     public void onApplicationEvent(ContextRefreshedEvent event) {
+        // 全局refresh完后执行
         if (isDelay() && !isExported() && !isUnexported()) {
             if (logger.isInfoEnabled()) {
                 logger.info("The service ready on spring started. service: " + getInterface());
@@ -119,24 +120,33 @@ public class ServiceBean<T> extends ServiceConfig<T> implements InitializingBean
     @Override
     @SuppressWarnings({"unchecked", "deprecation"})
     public void afterPropertiesSet() throws Exception {
-        if (getProvider() == null) {
+        // 前面的就是读取对应上级配置加载到当前对象中
+        if (getProvider() == null) {// service本身无配置provider
+            // 拿本地全局的provider
             Map<String, ProviderConfig> providerConfigMap = applicationContext == null ? null : BeanFactoryUtils.beansOfTypeIncludingAncestors(applicationContext, ProviderConfig.class, false, false);
             if (providerConfigMap != null && providerConfigMap.size() > 0) {
+                // 全局有provider
                 Map<String, ProtocolConfig> protocolConfigMap = applicationContext == null ? null : BeanFactoryUtils.beansOfTypeIncludingAncestors(applicationContext, ProtocolConfig.class, false, false);
+                // 全局无Protocol，但有多个provider
                 if ((protocolConfigMap == null || protocolConfigMap.size() == 0)
                         && providerConfigMap.size() > 1) { // backward compatibility
                     List<ProviderConfig> providerConfigs = new ArrayList<ProviderConfig>();
+
+                    // 等于把多个provider都加进
                     for (ProviderConfig config : providerConfigMap.values()) {
                         if (config.isDefault() != null && config.isDefault().booleanValue()) {
                             providerConfigs.add(config);
                         }
                     }
+                    // 无Protocol，多个provider
                     if (!providerConfigs.isEmpty()) {
                         setProviders(providerConfigs);
                     }
                 } else {
+                    // 全局有Protocol
                     ProviderConfig providerConfig = null;
                     for (ProviderConfig config : providerConfigMap.values()) {
+                        // 只能有1个默认provider
                         if (config.isDefault() == null || config.isDefault().booleanValue()) {
                             if (providerConfig != null) {
                                 throw new IllegalStateException("Duplicate provider configs: " + providerConfig + " and " + config);
@@ -144,6 +154,7 @@ public class ServiceBean<T> extends ServiceConfig<T> implements InitializingBean
                             providerConfig = config;
                         }
                     }
+                    // 有Protocol，只使用默认单个provider
                     if (providerConfig != null) {
                         setProvider(providerConfig);
                     }
@@ -186,17 +197,23 @@ public class ServiceBean<T> extends ServiceConfig<T> implements InitializingBean
                 }
             }
         }
+        // 注册中心
         if ((getRegistries() == null || getRegistries().isEmpty())
                 && (getProvider() == null || getProvider().getRegistries() == null || getProvider().getRegistries().isEmpty())
                 && (getApplication() == null || getApplication().getRegistries() == null || getApplication().getRegistries().isEmpty())) {
+            // 即service各种都没配，无法从任意一个中从注册中心配置
+
+            // 全局Registry
             Map<String, RegistryConfig> registryConfigMap = applicationContext == null ? null : BeanFactoryUtils.beansOfTypeIncludingAncestors(applicationContext, RegistryConfig.class, false, false);
             if (registryConfigMap != null && registryConfigMap.size() > 0) {
                 List<RegistryConfig> registryConfigs = new ArrayList<RegistryConfig>();
                 for (RegistryConfig config : registryConfigMap.values()) {
+                    // 就是获取配置了默认的Registry集合
                     if (config.isDefault() == null || config.isDefault().booleanValue()) {
                         registryConfigs.add(config);
                     }
                 }
+                // 使用配置了默认的Registry集合
                 if (registryConfigs != null && !registryConfigs.isEmpty()) {
                     super.setRegistries(registryConfigs);
                 }
@@ -243,6 +260,9 @@ public class ServiceBean<T> extends ServiceConfig<T> implements InitializingBean
                 setPath(beanName);
             }
         }
+
+        // 有延迟判断
+        // 导出!!!
         if (!isDelay()) {
             export();
         }
@@ -263,6 +283,7 @@ public class ServiceBean<T> extends ServiceConfig<T> implements InitializingBean
      */
     @Override
     public void export() {
+        // ServiceConfig
         super.export();
         // Publish ServiceBeanExportedEvent
         publishExportEvent();

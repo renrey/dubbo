@@ -68,9 +68,11 @@ public class DefaultFuture implements ResponseFuture {
     public DefaultFuture(Channel channel, Request request, int timeout) {
         this.channel = channel;
         this.request = request;
+        // 请求
         this.id = request.getId();
         this.timeout = timeout > 0 ? timeout : channel.getUrl().getPositiveParameter(Constants.TIMEOUT_KEY, Constants.DEFAULT_TIMEOUT);
         // put into waiting map.
+        // 放入全局map -》key=请求id
         FUTURES.put(id, this);
         CHANNELS.put(id, channel);
     }
@@ -115,10 +117,13 @@ public class DefaultFuture implements ResponseFuture {
 
     public static void received(Channel channel, Response response) {
         try {
+            // 根据id在全局map找到future
             DefaultFuture future = FUTURES.remove(response.getId());
             if (future != null) {
+                // 执行唤醒请求、执行异步回调
                 future.doReceived(response);
             } else {
+                // 没找到代表已超过
                 logger.warn("The timeout response finally returned at "
                         + (new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS").format(new Date()))
                         + ", response " + response
@@ -140,9 +145,10 @@ public class DefaultFuture implements ResponseFuture {
         if (timeout <= 0) {
             timeout = Constants.DEFAULT_TIMEOUT;
         }
+        // 同步等待
         if (!isDone()) {
             long start = System.currentTimeMillis();
-            lock.lock();
+            lock.lock();// 利用lock的条件队列唤醒
             try {
                 while (!isDone()) {
                     done.await(timeout, TimeUnit.MILLISECONDS);
@@ -283,6 +289,7 @@ public class DefaultFuture implements ResponseFuture {
         } finally {
             lock.unlock();
         }
+        // 执行异步回调
         if (callback != null) {
             invokeCallback(callback);
         }

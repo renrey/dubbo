@@ -52,6 +52,7 @@ public class ZookeeperRegistry extends FailbackRegistry {
 
     private final Set<String> anyServices = new ConcurrentHashSet<String>();
 
+    // key= url，v = map
     private final ConcurrentMap<URL, ConcurrentMap<NotifyListener, ChildListener>> zkListeners = new ConcurrentHashMap<URL, ConcurrentMap<NotifyListener, ChildListener>>();
 
     private final ZookeeperClient zkClient;
@@ -66,10 +67,13 @@ public class ZookeeperRegistry extends FailbackRegistry {
             group = Constants.PATH_SEPARATOR + group;
         }
         this.root = group;
+        // 发起连接
         zkClient = zookeeperTransporter.connect(url);
+        // 客户端连接状态变化
         zkClient.addStateListener(new StateListener() {
             @Override
             public void stateChanged(int state) {
+                // 重新连接，恢复
                 if (state == RECONNECTED) {
                     try {
                         recover();
@@ -111,6 +115,9 @@ public class ZookeeperRegistry extends FailbackRegistry {
     @Override
     protected void doRegister(URL url) {
         try {
+            // 往zk写入对应url的znode
+            // 路径：/dubbo/XXXservice/providers（分类）/具体url协议
+            //临时节点
             zkClient.create(toUrlPath(url), url.getParameter(Constants.DYNAMIC_KEY, true));
         } catch (Throwable e) {
             throw new RpcException("Failed to register " + url + " to zookeeper " + getUrl() + ", cause: " + e.getMessage(), e);
@@ -128,19 +135,27 @@ public class ZookeeperRegistry extends FailbackRegistry {
 
     @Override
     protected void doSubscribe(final URL url, final NotifyListener listener) {
+        // 订阅本身就是消费者行为
+        // NotifyListener: dubbo定义的监听器
         try {
+            // 进来没指定接口类
             if (Constants.ANY_VALUE.equals(url.getServiceInterface())) {
+                // znode中的根路径：默認/dubbo
                 String root = toRootPath();
+                // 通过根的url找到对应listeners集合
                 ConcurrentMap<NotifyListener, ChildListener> listeners = zkListeners.get(url);
                 if (listeners == null) {
                     zkListeners.putIfAbsent(url, new ConcurrentHashMap<NotifyListener, ChildListener>());
                     listeners = zkListeners.get(url);
                 }
+                // listeners map中通过当前listener获取
                 ChildListener zkListener = listeners.get(listener);
                 if (zkListener == null) {
-                    listeners.putIfAbsent(listener, new ChildListener() {
+                    // 当前listener没放过，放入1个
+                    listeners.putIfAbsent(listener, new ChildListener() {// 就是子节点发生变化
                         @Override
                         public void childChanged(String parentPath, List<String> currentChilds) {
+                            // 对全新的子节点list 每个都重新订阅
                             for (String child : currentChilds) {
                                 child = URL.decode(child);
                                 if (!anyServices.contains(child)) {
@@ -153,20 +168,27 @@ public class ZookeeperRegistry extends FailbackRegistry {
                     });
                     zkListener = listeners.get(listener);
                 }
-                zkClient.create(root, false);
+                // 创建/dubbo
+                zkClient.create(root, false);// 创建znode，持久化节点
+                // zk 客户端新建 监听/dubbo 的变化 -》即service类的变动
                 List<String> services = zkClient.addChildListener(root, zkListener);
                 if (services != null && !services.isEmpty()) {
+                    // 订阅当前/dubbo/ 下每个的service的
                     for (String service : services) {
                         service = URL.decode(service);
+                        // 加入到本地Services集合
                         anyServices.add(service);
+                        // 订阅当前service（走下面的有INTERFACE_KEY逻辑）
                         subscribe(url.setPath(service).addParameters(Constants.INTERFACE_KEY, service,
                                 Constants.CHECK_KEY, String.valueOf(false)), listener);
                     }
                 }
             } else {
+                // 有定义INTERFACE_KEY -》指定接口类名
                 List<URL> urls = new ArrayList<URL>();
-                for (String path : toCategoriesPath(url)) {
+                for (String path : toCategoriesPath(url)) {// 看url中有没有定义category，自定义了的话直接使用1个，默认*则是多个（providers、consumer等）
                     ConcurrentMap<NotifyListener, ChildListener> listeners = zkListeners.get(url);
+                    // 放入监听器
                     if (listeners == null) {
                         zkListeners.putIfAbsent(url, new ConcurrentHashMap<NotifyListener, ChildListener>());
                         listeners = zkListeners.get(url);
@@ -181,12 +203,18 @@ public class ZookeeperRegistry extends FailbackRegistry {
                         });
                         zkListener = listeners.get(listener);
                     }
+                    // 创建这个service类的znode--> 创建新znode 持久化的，/dubbo/com.xx.XXXservice/prorvider
                     zkClient.create(path, false);
-                    List<String> children = zkClient.addChildListener(path, zkListener);
+                    // 已存在这个znode，监听下面的子节点 -》即provider子节点的下的变化
+                    List<String> children = zkClient.addChildListener(path, zkListener);// 监听
+                    // 过滤不符合消费url的provider
                     if (children != null) {
                         urls.addAll(toUrlsWithEmpty(url, path, children));
                     }
                 }
+                // 对符合的provider执行
+                // 1. 当前消费者url 符合的provider保存到内存、还有本地缓存文件
+                // 2. 生成发送rpc请求的invoker
                 notify(url, listener, urls);
             }
         } catch (Throwable e) {
@@ -270,14 +298,17 @@ public class ZookeeperRegistry extends FailbackRegistry {
     }
 
     private String toUrlPath(URL url) {
+        // PATH= /dubbo/XXXservice/providers（分类）/具体url协议
         return toCategoryPath(url) + Constants.PATH_SEPARATOR + URL.encode(url.toFullString());
     }
 
     private List<URL> toUrlsWithoutEmpty(URL consumer, List<String> providers) {
         List<URL> urls = new ArrayList<URL>();
         if (providers != null && !providers.isEmpty()) {
+            // 遍历提供者url协议
             for (String provider : providers) {
                 provider = URL.decode(provider);
+                // 判断是否符合消费要求
                 if (provider.contains("://")) {
                     URL url = URL.valueOf(provider);
                     if (UrlUtils.isMatch(consumer, url)) {
@@ -290,6 +321,7 @@ public class ZookeeperRegistry extends FailbackRegistry {
     }
 
     private List<URL> toUrlsWithEmpty(URL consumer, String path, List<String> providers) {
+        // 过滤掉不符合消费要求的提供者
         List<URL> urls = toUrlsWithoutEmpty(consumer, providers);
         if (urls == null || urls.isEmpty()) {
             int i = path.lastIndexOf('/');

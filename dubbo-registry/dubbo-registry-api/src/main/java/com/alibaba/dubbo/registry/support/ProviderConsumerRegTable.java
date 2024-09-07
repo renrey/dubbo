@@ -31,6 +31,8 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class ProviderConsumerRegTable {
     public static ConcurrentHashMap<String, Set<ProviderInvokerWrapper>> providerInvokers = new ConcurrentHashMap<String, Set<ProviderInvokerWrapper>>();
+
+    // 本地生成引用的serivce接口，及其invoker，servicekey可按照group、接口版本再细分
     public static ConcurrentHashMap<String, Set<ConsumerInvokerWrapper>> consumerInvokers = new ConcurrentHashMap<String, Set<ConsumerInvokerWrapper>>();
 
     public static void registerProvider(Invoker invoker, URL registryUrl, URL providerUrl) {
@@ -74,8 +76,12 @@ public class ProviderConsumerRegTable {
     }
 
     public static void registerConsumer(Invoker invoker, URL registryUrl, URL consumerUrl, RegistryDirectory registryDirectory) {
+        // 再包装一层invoker
         ConsumerInvokerWrapper wrapperInvoker = new ConsumerInvokerWrapper(invoker, registryUrl, consumerUrl, registryDirectory);
+
+        // 生成接口key，如果有配置group、版本，会有体现（3种）
         String serviceUniqueName = consumerUrl.getServiceKey();
+        // 放入到本地map
         Set<ConsumerInvokerWrapper> invokers = consumerInvokers.get(serviceUniqueName);
         if (invokers == null) {
             consumerInvokers.putIfAbsent(serviceUniqueName, new ConcurrentHashSet<ConsumerInvokerWrapper>());

@@ -40,6 +40,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * AbstractClusterInvoker
+ * 集群分布式invoker 代表 当前service 有多个 provider可调用，怎么协调调用的方法？ 负载均衡选择、广播、等
+ * 未到具体节点的
  *
  */
 public abstract class AbstractClusterInvoker<T> implements Invoker<T> {
@@ -230,17 +232,29 @@ public abstract class AbstractClusterInvoker<T> implements Invoker<T> {
         LoadBalance loadbalance = null;
 
         // binding attachments into invocation.
+        // 如果业务方法调用前，没使用RpcContext，这里会在线程本地创建
         Map<String, String> contextAttachments = RpcContext.getContext().getAttachments();
+
+        // 如果调用前在RpcContext设置了Attachments，把Attachments设置到invocation
         if (contextAttachments != null && contextAttachments.size() != 0) {
             ((RpcInvocation) invocation).addAttachments(contextAttachments);
         }
 
+        // 获取当前的invocation 符合invokers
         List<Invoker<T>> invokers = list(invocation);
+
+
+        // 获取负载均衡的extens，手动指定的话是 url参数loadbalance，未指定默认是random
+        // com.alibaba.dubbo.rpc.cluster.loadbalance.RandomLoadBalance
         if (invokers != null && !invokers.isEmpty()) {
             loadbalance = ExtensionLoader.getExtensionLoader(LoadBalance.class).getExtension(invokers.get(0).getUrl()
                     .getMethodParameter(RpcUtils.getMethodName(invocation), Constants.LOADBALANCE_KEY, Constants.DEFAULT_LOADBALANCE));
         }
+
+        // 客户端异步执行相关(不是说底层异步)
         RpcUtils.attachInvocationIdIfAsync(getUrl(), invocation);
+
+        // 调用具体spi实现类
         return doInvoke(invocation, invokers, loadbalance);
     }
 
@@ -274,6 +288,7 @@ public abstract class AbstractClusterInvoker<T> implements Invoker<T> {
                                        LoadBalance loadbalance) throws RpcException;
 
     protected List<Invoker<T>> list(Invocation invocation) throws RpcException {
+        // 就是本地目录服务中找
         List<Invoker<T>> invokers = directory.list(invocation);
         return invokers;
     }

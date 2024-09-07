@@ -50,12 +50,13 @@ public class ConsistentHashLoadBalance extends AbstractLoadBalance {
             selectors.put(key, new ConsistentHashSelector<T>(invokers, methodName, identityHashCode));
             selector = (ConsistentHashSelector<T>) selectors.get(key);
         }
+        // 通过每个方法的选择器选择
         return selector.select(invocation);
     }
 
     private static final class ConsistentHashSelector<T> {
 
-        private final TreeMap<Long, Invoker<T>> virtualInvokers;
+        private final TreeMap<Long, Invoker<T>> virtualInvokers;// 虚拟节点
 
         private final int replicaNumber;
 
@@ -67,27 +68,41 @@ public class ConsistentHashLoadBalance extends AbstractLoadBalance {
             this.virtualInvokers = new TreeMap<Long, Invoker<T>>();
             this.identityHashCode = identityHashCode;
             URL url = invokers.get(0).getUrl();
+            // 默认160个节点
+            // 大概hash环上的节点
             this.replicaNumber = url.getMethodParameter(methodName, "hash.nodes", 160);
             String[] index = Constants.COMMA_SPLIT_PATTERN.split(url.getMethodParameter(methodName, "hash.arguments", "0"));
             argumentIndex = new int[index.length];
             for (int i = 0; i < index.length; i++) {
                 argumentIndex[i] = Integer.parseInt(index[i]);
             }
+            // 每个invoker准备生成 虚拟节点
             for (Invoker<T> invoker : invokers) {
                 String address = invoker.getUrl().getAddress();
+                // 应该是把环分成4部分，每部分节点数=replicaNumber / 4->默认40个节点
                 for (int i = 0; i < replicaNumber / 4; i++) {
+                    // 对地址进行MD5-》地址+环部分序号
                     byte[] digest = md5(address + i);
+                    // 每个invoker执行4次（4部分）
                     for (int h = 0; h < 4; h++) {
                         long m = hash(digest, h);
+                        // 虚拟节点的序号
                         virtualInvokers.put(m, invoker);
                     }
                 }
             }
+            // 问题：
+            // 1. 如果invoekr数超过1部分的节点数？ -》 就算不超过，hash冲突也无法避免的，所以看hash冲突解决
+            // 2. hash值冲突？-》好像顺序后覆盖
         }
 
         public Invoker<T> select(Invocation invocation) {
+            // 对参数生成key，就拼接在一起
             String key = toKey(invocation.getArguments());
+            // 进行md5
             byte[] digest = md5(key);
+            // 对参数hash
+            // 基于hash查找（向后找第一个大于hash的node）-> 基于treemap中从hash开始的entry，第一个entry
             return selectForKey(hash(digest, 0));
         }
 
@@ -102,6 +117,7 @@ public class ConsistentHashLoadBalance extends AbstractLoadBalance {
         }
 
         private Invoker<T> selectForKey(long hash) {
+            // treemap中从hash开始的entry，第一个entry
             Map.Entry<Long, Invoker<T>> entry = virtualInvokers.tailMap(hash, true).firstEntry();
             if (entry == null) {
                 entry = virtualInvokers.firstEntry();

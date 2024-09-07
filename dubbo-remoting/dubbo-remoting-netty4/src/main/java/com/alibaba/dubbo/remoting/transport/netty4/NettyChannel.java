@@ -98,10 +98,11 @@ final class NettyChannel extends AbstractChannel {
         boolean success = true;
         int timeout = 0;
         try {
+            // 直接强制发送
             ChannelFuture future = channel.writeAndFlush(message);
             if (sent) {
                 timeout = getUrl().getPositiveParameter(Constants.TIMEOUT_KEY, Constants.DEFAULT_TIMEOUT);
-                success = future.await(timeout);
+                success = future.await(timeout);// 等待指定超时时间
             }
             Throwable cause = future.cause();
             if (cause != null) {

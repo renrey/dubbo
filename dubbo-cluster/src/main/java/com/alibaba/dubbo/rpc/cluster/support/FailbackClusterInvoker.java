@@ -69,6 +69,7 @@ public class FailbackClusterInvoker<T> extends AbstractClusterInvoker<T> {
         if (retryFuture == null) {
             synchronized (this) {
                 if (retryFuture == null) {
+                    // 提交到线程池，5s后再执行
                     retryFuture = scheduledExecutorService.scheduleWithFixedDelay(new Runnable() {
 
                         @Override

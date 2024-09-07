@@ -112,6 +112,7 @@ public abstract class AbstractZookeeperClient<TargetChildListener> implements Zo
             listeners.putIfAbsent(listener, createTargetChildListener(path, listener));
             targetListener = listeners.get(listener);
         }
+        // 调用zk 客户端api 添加listener （监听子节点变化）
         return addTargetChildListener(path, targetListener);
     }
 

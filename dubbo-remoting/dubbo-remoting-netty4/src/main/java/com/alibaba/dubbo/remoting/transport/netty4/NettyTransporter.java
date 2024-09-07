@@ -27,11 +27,13 @@ public class NettyTransporter implements Transporter {
 
     public static final String NAME = "netty";
 
+
+    // 绑定端口等待连接
     @Override
     public Server bind(URL url, ChannelHandler listener) throws RemotingException {
         return new NettyServer(url, listener);
     }
-
+    // 发起连接：就是客户端
     @Override
     public Client connect(URL url, ChannelHandler listener) throws RemotingException {
         return new NettyClient(url, listener);

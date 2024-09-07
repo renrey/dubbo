@@ -57,6 +57,7 @@ public class HeaderExchangeHandler implements ChannelHandlerDelegate {
 
     static void handleResponse(Channel channel, Response response) throws RemotingException {
         if (response != null && !response.isHeartbeat()) {
+            // 通过
             DefaultFuture.received(channel, response);
         }
     }
@@ -75,7 +76,9 @@ public class HeaderExchangeHandler implements ChannelHandlerDelegate {
         }
     }
 
+    // 处理请求
     Response handleRequest(ExchangeChannel channel, Request req) throws RemotingException {
+        // 先初始化响应对象
         Response res = new Response(req.getId(), req.getVersion());
         if (req.isBroken()) {
             Object data = req.getData();
@@ -90,9 +93,10 @@ public class HeaderExchangeHandler implements ChannelHandlerDelegate {
             return res;
         }
         // find handler by message class.
-        Object msg = req.getData();
+        Object msg = req.getData();// 读取请求具体内容
         try {
             // handle data.
+            // 调用handler 来调用业务层
             Object result = handler.reply(channel, msg);
             res.setStatus(Response.OK);
             res.setResult(result);
@@ -163,6 +167,7 @@ public class HeaderExchangeHandler implements ChannelHandlerDelegate {
         channel.setAttribute(KEY_READ_TIMESTAMP, System.currentTimeMillis());
         ExchangeChannel exchangeChannel = HeaderExchangeChannel.getOrAddChannel(channel);
         try {
+            // 服务端收到请求，处理
             if (message instanceof Request) {
                 // handle request.
                 Request request = (Request) message;
@@ -170,13 +175,18 @@ public class HeaderExchangeHandler implements ChannelHandlerDelegate {
                     handlerEvent(channel, request);
                 } else {
                     if (request.isTwoWay()) {
+                        // 处理请求
                         Response response = handleRequest(exchangeChannel, request);
+                        // 结果发送
                         channel.send(response);
                     } else {
+                        // 单向-》直接执行无需返回结果
                         handler.received(exchangeChannel, request.getData());
                     }
                 }
+            // 客户端收到响应
             } else if (message instanceof Response) {
+                // 处理服务端响应 -》通过id回找future，并执行唤醒等待线程、执行异步回调函数
                 handleResponse(channel, (Response) message);
             } else if (message instanceof String) {
                 if (isClientSide(channel)) {

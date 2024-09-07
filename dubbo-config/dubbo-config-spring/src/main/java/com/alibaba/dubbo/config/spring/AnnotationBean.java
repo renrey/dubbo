@@ -291,6 +291,7 @@ public class AnnotationBean extends AbstractConfig implements DisposableBean, Be
                 if (reference.module().length() > 0) {
                     referenceConfig.setModule(applicationContext.getBean(reference.module(), ModuleConfig.class));
                 }
+                // 从
                 if (reference.consumer().length() > 0) {
                     referenceConfig.setConsumer(applicationContext.getBean(reference.consumer(), ConsumerConfig.class));
                 }

@@ -61,19 +61,26 @@ public class NettyClient extends AbstractClient {
     private volatile Channel channel; // volatile, please copy reference to use
 
     public NettyClient(final URL url, final ChannelHandler handler) throws RemotingException {
+        // wrapChannelHandler: 基于参数handler包装1层handler
         super(url, wrapChannelHandler(url, handler));
+        // 实际包装后的handler：
+        // 1. MultiMessageHandler（把多个消息拆成单个一个个执行） -》
+        // 2. HeartbeatHandler （心跳）-》
+        // 3. AllChannelHandler（spi Dispatcher作用-》当前任务提交到业务线程池执行） -》handler ---这里都是异步执行
+        //  4. decodeHandler handler -》HeaderExchangeHandler-》ExchangeHandler
     }
 
     @Override
     protected void doOpen() throws Throwable {
+        // 主要是基于netty的dubbo包装 -》在netty上调用定义的dubbo handler
         final NettyClientHandler nettyClientHandler = new NettyClientHandler(getUrl(), this);
         bootstrap = new Bootstrap();
-        bootstrap.group(nioEventLoopGroup)
+        bootstrap.group(nioEventLoopGroup)// （客户端）线程数：核数+1，线程名字：NettyClientWorker
                 .option(ChannelOption.SO_KEEPALIVE, true)
                 .option(ChannelOption.TCP_NODELAY, true)
                 .option(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT)
                 //.option(ChannelOption.CONNECT_TIMEOUT_MILLIS, getTimeout())
-                .channel(NioSocketChannel.class);
+                .channel(NioSocketChannel.class);// channel还是正常的
 
         if (getConnectTimeout() < 3000) {
             bootstrap.option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 3000);
@@ -86,10 +93,11 @@ public class NettyClient extends AbstractClient {
             @Override
             protected void initChannel(Channel ch) throws Exception {
                 NettyCodecAdapter adapter = new NettyCodecAdapter(getCodec(), getUrl(), NettyClient.this);
+                // 先是序列化、反序列
                 ch.pipeline()//.addLast("logging",new LoggingHandler(LogLevel.INFO))//for debug
                         .addLast("decoder", adapter.getDecoder())
                         .addLast("encoder", adapter.getEncoder())
-                        .addLast("handler", nettyClientHandler);
+                        .addLast("handler", nettyClientHandler);// 传入实际handler链（）
                 String socksProxyHost = ConfigUtils.getProperty(SOCKS_PROXY_HOST);
                 if(socksProxyHost != null) {
                     int socksProxyPort = Integer.parseInt(ConfigUtils.getProperty(SOCKS_PROXY_PORT, DEFAULT_SOCKS_PROXY_PORT));

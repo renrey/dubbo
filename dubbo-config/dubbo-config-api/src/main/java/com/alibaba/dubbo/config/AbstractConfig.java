@@ -410,6 +410,7 @@ public abstract class AbstractConfig implements Serializable {
 
     protected void appendAnnotation(Class<?> annotationClass, Object annotation) {
         Method[] methods = annotationClass.getMethods();
+        // 遍历注解方法
         for (Method method : methods) {
             if (method.getDeclaringClass() != Object.class
                     && method.getReturnType() != void.class
@@ -418,10 +419,14 @@ public abstract class AbstractConfig implements Serializable {
                     && !Modifier.isStatic(method.getModifiers())) {
                 try {
                     String property = method.getName();
+                    // 接口相关
                     if ("interfaceClass".equals(property) || "interfaceName".equals(property)) {
                         property = "interface";
                     }
+
+                    // setter方法名
                     String setter = "set" + property.substring(0, 1).toUpperCase() + property.substring(1);
+                    // 调用对应注解方法，获取值
                     Object value = method.invoke(annotation);
                     if (!isAnnotationArray(method.getReturnType()) &&  value != null && !value.equals(method.getDefaultValue())) {
                         Class<?> parameterType = ReflectUtils.getBoxedClass(method.getReturnType());
@@ -433,6 +438,7 @@ public abstract class AbstractConfig implements Serializable {
                             value = CollectionUtils.toStringMap((String[]) value);
                         }
                         try {
+                            // 调用本对象setter方法，把注解值放入当前config对象中
                             Method setterMethod = getClass().getMethod(setter, parameterType);
                             setterMethod.invoke(this, value);
                         } catch (NoSuchMethodException e) {

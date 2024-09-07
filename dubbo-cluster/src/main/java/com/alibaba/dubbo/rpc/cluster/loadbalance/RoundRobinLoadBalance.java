@@ -99,28 +99,43 @@ public class RoundRobinLoadBalance extends AbstractLoadBalance {
         long now = System.currentTimeMillis();
         Invoker<T> selectedInvoker = null;
         WeightedRoundRobin selectedWRR = null;
+        // 循环
         for (Invoker<T> invoker : invokers) {
             String identifyString = invoker.getUrl().toIdentityString();
+            // 获取当前invoker缓存
             WeightedRoundRobin weightedRoundRobin = map.get(identifyString);
-            int weight = getWeight(invoker, invocation);
+            int weight = getWeight(invoker, invocation);// 获取invoker权重
             if (weight < 0) {
                 weight = 0;
             }
+            // 当前invoker的方法未创建WeightedRoundRobin
             if (weightedRoundRobin == null) {
                 weightedRoundRobin = new WeightedRoundRobin();
                 weightedRoundRobin.setWeight(weight);
                 map.putIfAbsent(identifyString, weightedRoundRobin);
                 weightedRoundRobin = map.get(identifyString);
             }
+            // 更新weightedRoundRobin缓存的权重
             if (weight != weightedRoundRobin.getWeight()) {
                 //weight changed
                 weightedRoundRobin.setWeight(weight);
             }
+
+            // 往自己weightedRoundRobin对象的current +权重
             long cur = weightedRoundRobin.increaseCurrent();
+
             weightedRoundRobin.setLastUpdate(now);
+
+            // 如：a100 b 100 c100
+            // 初始 a、b、c都是100 ，cur=100，selectedInvoker=a（第一个），结束后a-300
+            // 第二次 a=-100 b=200 c=200 cur=200，selectedInvoker=b，结束后b-300
+            // 第三次 a= 0 ，b = 0，c=300 selectedInvoker=c 结束c-300
+            // 第4次 a=100，b=100，c=0 cur=100 selectedInvoker=a
+            // 本次加权重后的cur大于原来的maxCurrent
             if (cur > maxCurrent) {
-                maxCurrent = cur;
-                selectedInvoker = invoker;
+                // 一般应该循环后，应该是最后一个？
+                maxCurrent = cur;// 更新
+                selectedInvoker = invoker;// 但只有这个更新使用invoker
                 selectedWRR = weightedRoundRobin;
             }
             totalWeight += weight;
@@ -144,7 +159,9 @@ public class RoundRobinLoadBalance extends AbstractLoadBalance {
                 }
             }
         }
+        // 就是有invoker
         if (selectedInvoker != null) {
+            // cur减掉 总权重
             selectedWRR.sel(totalWeight);
             return selectedInvoker;
         }

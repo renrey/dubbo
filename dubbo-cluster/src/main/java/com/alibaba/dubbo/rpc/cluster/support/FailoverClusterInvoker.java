@@ -69,14 +69,21 @@ public class FailoverClusterInvoker<T> extends AbstractClusterInvoker<T> {
             //NOTE: if `invokers` changed, then `invoked` also lose accuracy.
             if (i > 0) {
                 checkWhetherDestroyed();
+                // 获取符合provider的invoker
                 copyinvokers = list(invocation);
                 // check again
                 checkInvokers(copyinvokers, invocation);
             }
+            // 对符合条件的进行负载均衡
             Invoker<T> invoker = select(loadbalance, invocation, copyinvokers, invoked);
             invoked.add(invoker);
             RpcContext.getContext().setInvokers((List) invoked);
             try {
+                // 调用
+                /**
+                 *具体发起请求
+                 * @see com.alibaba.dubbo.rpc.protocol.dubbo.DubboInvoker#doInvoke(Invocation)
+                 */
                 Result result = invoker.invoke(invocation);
                 if (le != null && logger.isWarnEnabled()) {
                     logger.warn("Although retry the method " + methodName

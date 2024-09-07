@@ -44,7 +44,10 @@ public class ChannelHandlers {
     }
 
     protected ChannelHandler wrapInternal(ChannelHandler handler, URL url) {
+        // 1. MultiMessageHandler（把多个消息拆成单个一个个执行） -》
+        // 2. HeartbeatHandler （心跳）-》
+        // 3. AllChannelHandler（Dispatcher作用-》当前任务提交到业务线程池执行） -》handler参数
         return new MultiMessageHandler(new HeartbeatHandler(ExtensionLoader.getExtensionLoader(Dispatcher.class)
-                .getAdaptiveExtension().dispatch(handler, url)));
+                .getAdaptiveExtension().dispatch(handler, url)));// 默认使用all :AllDispatcher
     }
 }

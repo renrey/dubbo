@@ -67,6 +67,9 @@ final class NettyCodecAdapter {
             Channel ch = ctx.channel();
             NettyChannel channel = NettyChannel.getOrAddChannel(ch, url, handler);
             try {
+                /**
+                 * @see com.alibaba.dubbo.rpc.protocol.dubbo.DubboCountCodec#encode(com.alibaba.dubbo.remoting.Channel, ChannelBuffer, Object) 
+                 */
                 codec.encode(channel, buffer, msg);
             } finally {
                 NettyChannel.removeChannelIfDisconnected(ch);

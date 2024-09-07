@@ -43,6 +43,7 @@ public class Online implements BaseCommand {
     @Override
     public String execute(CommandContext commandContext, String[] args) {
         logger.info("receive online command");
+        // 相关的service
         String servicePattern = ".*";
         if (args != null && args.length > 0) {
             servicePattern = args[0];
